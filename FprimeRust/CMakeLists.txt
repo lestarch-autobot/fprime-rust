@@ -8,6 +8,8 @@
 ####
 register_fprime_library(
         FprimeRust
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/FprimeRust.cpp"
     HEADERS
         "${CMAKE_CURRENT_LIST_DIR}/FprimeRust.hpp"
     DEPENDS
