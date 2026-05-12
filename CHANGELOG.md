@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.1.0] - Unreleased
 
+### Changed
+
+- Generated `Context` helper methods now mirror the standard F Prime C++
+  `ComponentBase` API names exactly: `tlmWrite_<Channel>`,
+  `log_<SEVERITY>_<Event>`, `paramGet_<Param>`, and `cmdResponse_out`.
+  Previously the generator emitted `tlm_write_*`, `log_*` (severity
+  stripped), `param_*`, and `command_response`, which forced Rust authors
+  to learn a parallel vocabulary.  Generated modules now carry a
+  `#![allow(non_snake_case)]` so Rust's snake_case lint stays quiet.
+
 ### Added
 
 - Initial public scaffolding for a Rust autocoder for F Prime.

@@ -130,10 +130,14 @@ def test_rust_base_module(component) -> None:
     # Inbound dispatch shims
     assert 'pub unsafe extern "C" fn rust_rust_example_new' in base
     assert 'pub unsafe extern "C" fn rust_rust_example_cmd_Bump' in base
-    # Helper methods on Context
-    assert "pub fn tlm_write_Counter" in base
-    assert "pub fn log_Bumped(&self, value: u32)" in base
-    assert "pub fn param_Threshold" in base
+    # Helper methods on Context mirror the C++ ComponentBase API exactly:
+    # tlmWrite_<Channel>, log_<SEVERITY>_<Event>, paramGet_<Param>,
+    # cmdResponse_out -- no snake_case translation, no severity stripping.
+    assert "pub fn tlmWrite_Counter" in base
+    assert "pub fn log_ACTIVITY_LO_Bumped(&self, value: u32)" in base
+    assert "pub fn log_ACTIVITY_LO_ResetIssued(&self)" in base
+    assert "pub fn paramGet_Threshold" in base
+    assert "pub fn cmdResponse_out(&self, status: CmdResponse)" in base
 
 
 def test_rust_user_template(component) -> None:
@@ -143,7 +147,7 @@ def test_rust_user_template(component) -> None:
     # Includes a stub body for both commands
     assert "fn Reset_cmd_handler" in template
     assert "fn Bump_cmd_handler" in template
-    assert "ctx.command_response(CmdResponse::Ok)" in template
+    assert "ctx.cmdResponse_out(CmdResponse::Ok)" in template
 
 
 def test_cargo_artifacts(component, tmp_path: Path) -> None:

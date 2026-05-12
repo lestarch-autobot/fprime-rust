@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from .fpp_parser import FppArg, FppComponent
+from .fpp_parser import FppArg, FppComponent, severity_to_log_infix
 
 
 def _ffi_name(component: FppComponent, suffix: str) -> str:
@@ -129,33 +129,53 @@ pub unsafe extern \"C\" fn {sym}({_rust_arg_list(c_args)}) {{
 
     # Telemetry/event/parameter helpers exposed on Context
     ctx_methods: List[str] = []
+    # Helper methods on ``Context`` mirror the protected C++ ``ComponentBase``
+    # API one-for-one (``tlmWrite_<Name>``, ``log_<SEVERITY>_<Name>``,
+    # ``paramGet_<Name>``, ``cmdResponse_out``) so Rust authors see the same
+    # names a C++ author would.  ``#![allow(non_snake_case)]`` at the top of
+    # the generated module silences Rust's snake_case lint.
     for ch in component.telemetry:
         sym = _ffi_name(component, f"tlm_{ch.name}")
         ctx_methods.append(
             f"""    /// Publish a value on the ``{ch.name}`` telemetry channel.
-    pub fn tlm_write_{ch.name}(&self, value: {ch.rust_type}) {{
+    ///
+    /// Mirrors the protected ``tlmWrite_{ch.name}`` method on the C++
+    /// ``{component.name}ComponentBase``.
+    pub fn tlmWrite_{ch.name}(&self, value: {ch.rust_type}) {{
         unsafe {{ ffi::{sym}(self.cpp_self, value) }};
     }}"""
         )
     for ev in component.events:
         sym = _ffi_name(component, f"event_{ev.name}")
+        infix = severity_to_log_infix(ev.severity)
         ctx_methods.append(f"""    /// Log the ``{ev.name}`` event.
-    pub fn log_{ev.name}(&self{', ' + _rust_arg_list(ev.args) if ev.args else ''}) {{
+    ///
+    /// Mirrors the protected ``log_{infix}_{ev.name}`` method on the C++
+    /// ``{component.name}ComponentBase``.
+    pub fn log_{infix}_{ev.name}(&self{', ' + _rust_arg_list(ev.args) if ev.args else ''}) {{
         unsafe {{ ffi::{sym}(self.cpp_self{', ' + _rust_arg_names(ev.args) if ev.args else ''}) }};
     }}""")
     for prm in component.parameters:
         sym = _ffi_name(component, f"param_{prm.name}")
         ctx_methods.append(
             f"""    /// Fetch the latest committed value of ``{prm.name}``.
-    pub fn param_{prm.name}(&self) -> ({prm.rust_type}, ParamValid) {{
+    ///
+    /// Mirrors the protected ``paramGet_{prm.name}`` method on the C++
+    /// ``{component.name}ComponentBase``.
+    pub fn paramGet_{prm.name}(&self) -> ({prm.rust_type}, ParamValid) {{
         let mut valid: u8 = 0;
         let v = unsafe {{ ffi::{sym}(self.cpp_self, &mut valid as *mut u8) }};
         (v, ParamValid::from_raw(valid))
     }}"""
         )
 
-    cmd_resp_method = f"""    /// Return a final command-response code (``OK``, ``EXECUTION_ERROR`` ...).
-    pub fn command_response(&self, status: CmdResponse) {{
+    cmd_resp_method = f"""    /// Emit the final response for the in-flight command.
+    ///
+    /// Mirrors the protected ``cmdResponse_out`` method on the C++
+    /// ``{component.name}ComponentBase``; the opcode and sequence number
+    /// of the in-flight command are stashed on ``Context`` and supplied
+    /// automatically.
+    pub fn cmdResponse_out(&self, status: CmdResponse) {{
         unsafe {{ ffi::{cmd_resp_sym}(self.cpp_self, self.op_code, self.cmd_seq, status as u8) }};
     }}"""
     ctx_methods.append(cmd_resp_method)
@@ -248,7 +268,7 @@ def render_user_template(component: FppComponent) -> str:
             sig = f"    fn {cmd.name}_cmd_handler(&mut self, ctx: &mut Context)"
         handler_stubs.append(f"""{sig} {{
         // TODO: implement {cmd.name} command behavior.
-        ctx.command_response(CmdResponse::Ok);
+        ctx.cmdResponse_out(CmdResponse::Ok);
     }}""")
     rendered = "\n\n".join(handler_stubs) if handler_stubs else "    // (no commands)"
 
