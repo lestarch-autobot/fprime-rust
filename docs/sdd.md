@@ -211,7 +211,9 @@ Rust-to-Rust synchronous edges are lock edges and must form a DAG (break cycles 
 reference does with `relay.countOut -> rustMonitor.countIn`). On a Rust component `sync` and `guarded` inputs
 are therefore equivalent and a Rust component is not suitable for lock-free cyclic work shared by several
 callers. Overflow hooks run on the caller's thread without the mutex and return immediately; `hook` is therefore the
-safe queue-full policy for inputs driven by rate groups, drivers or the command dispatcher. `parameter_updated` runs on the
+non-blocking queue-full policy for inputs driven by rate groups, drivers or the command dispatcher — provided the
+user's hook reports the loss (an event or a telemetry counter): the generated port-hook stub is a silent drop, and
+the command-hook stub answers `BUSY`. `parameter_updated` runs on the
 command caller's thread (parameter set/save commands are handled synchronously by the base for every kind) and at
 start-up on the loading thread, under the instance mutex; it must not block and must not assume the component
 thread.
