@@ -115,7 +115,7 @@ def _trait_block(view: ComponentView) -> List[str]:
                   f"    fn {names.rust_cmd_handler(command)}({params}) -> CmdResponse;"]
         if command.hook:
             lines += ["", f"    /// Overflow hook of command `{command.name}`: the returned response is sent for the command; Context only",
-                      f"    fn {names.rust_overflow_hook(command)}(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;"]
+                      f"    fn {names.rust_overflow_hook(command)}(ctx: &mut HookContext<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;"]
     lines += ["", "    /// A parameter was set (`PRM_SET`) or loaded at start-up",
               "    fn parameter_updated(&mut self, ctx: &mut Context<'_>, id: FwPrmIdType) {",
               "        let _ = (ctx, id);", "    }", "}"]
@@ -132,7 +132,7 @@ def _context_block(view: ComponentView) -> List[str]:
              "/// Borrows the shim's stack frame for one call: neither `Send` nor `Sync`.",
              "pub struct Context<'call> {", "    raw: &'call mut RawContext,", "    _marker: NotThreadSafe,", "}", "",
              "impl<'call> Context<'call> {",
-             "    /// Status of the queue drain that preceded this call (queued components; `Empty` otherwise)",
+             "    /// Status of the queue drain that preceded this call: `Ok` after a drain or when no drain ran (queued components drain on sync/guarded entries; the base reports the last dispatch status, DEVELOPMENT ruling 1)",
              "    pub fn last_dispatch(&self) -> MsgDispatchStatus {",
              "        MsgDispatchStatus::from_code(self.raw.last_dispatch)", "    }"]
     if view.is_queued_kind:
@@ -152,18 +152,7 @@ def _context_block(view: ComponentView) -> List[str]:
         lines += ["", f"    /// Invoke internal port `{port.name}` (queued to this instance)",
                   f"    pub fn {names.rust_internal_invoke(port)}({params}) {{",
                   f"        unsafe {{ ffi::{names.internal_invoke(view, port)}({', '.join(args)}) }}", "    }"]
-    for event in view.events:
-        params = ", ".join(["&mut self"] + user_params(event.params))
-        args = ["self.raw.component"] + encode_args(event.params)
-        lines += ["", f"    /// Log event `{event.name}` (severity {event.severity})",
-                  f"    pub fn {names.rust_log(event)}({params}) {{",
-                  f"        unsafe {{ ffi::{names.log(view, event)}({', '.join(args)}) }}", "    }"]
-    for channel in view.channels:
-        value = Param("value", channel.type)
-        args = ["self.raw.component"] + encode_args([value])
-        lines += ["", f"    /// Write telemetry channel `{channel.name}`",
-                  f"    pub fn {names.rust_tlm_write(channel)}(&mut self, value: {rust_user_type(channel.type)}) {{",
-                  f"        unsafe {{ ffi::{names.tlm_write(view, channel)}({', '.join(args)}) }}", "    }"]
+    lines += _event_and_telemetry_methods(view)
     for parameter in view.parameters:
         type_ = parameter.type
         ret = "String" if type_.kind == "string" else type_.rust
@@ -184,6 +173,31 @@ def _context_block(view: ComponentView) -> List[str]:
                 lines.append("        let value = carrier;")
         lines += ["        (value, ParamValid::from_code(valid))", "    }"]
     lines.append("}")
+    lines += ["", "/// Context of an overflow hook: events and telemetry only. The hook runs on the caller's thread while the",
+              "/// invoking handler may hold `&mut Implementation`, so no implementation access, no output or internal port,",
+              "/// no parameter (DEVELOPMENT ruling 6). Neither `Send` nor `Sync`.",
+              "pub struct HookContext<'call> {", "    raw: &'call mut RawContext,", "    _marker: NotThreadSafe,", "}", "",
+              "impl<'call> HookContext<'call> {"]
+    lines += _event_and_telemetry_methods(view)
+    lines.append("}")
+    return lines
+
+
+def _event_and_telemetry_methods(view: ComponentView) -> List[str]:
+    """`log_*` and `tlmWrite_*` methods, shared by `Context` and `HookContext`"""
+    lines: List[str] = []
+    for event in view.events:
+        params = ", ".join(["&mut self"] + user_params(event.params))
+        args = ["self.raw.component"] + encode_args(event.params)
+        lines += ["", f"    /// Log event `{event.name}` (severity {event.severity})",
+                  f"    pub fn {names.rust_log(event)}({params}) {{",
+                  f"        unsafe {{ ffi::{names.log(view, event)}({', '.join(args)}) }}", "    }"]
+    for channel in view.channels:
+        value = Param("value", channel.type)
+        args = ["self.raw.component"] + encode_args([value])
+        lines += ["", f"    /// Write telemetry channel `{channel.name}`",
+                  f"    pub fn {names.rust_tlm_write(channel)}(&mut self, value: {rust_user_type(channel.type)}) {{",
+                  f"        unsafe {{ ffi::{names.tlm_write(view, channel)}({', '.join(args)}) }}", "    }"]
     return lines
 
 
@@ -252,13 +266,13 @@ ENTRY_PRELUDE = [
 # Overflow hooks never touch the implementation: the invoking handler may hold `&mut Implementation` right now
 HOOK_PRELUDE = [
     "// SAFETY: the shim passes a context borrowed for this call; no implementation reference is created",
-    "let mut ctx = Context { raw: unsafe { &mut *fpr_ctx }, _marker: NotThreadSafe::new() };",
+    "let mut ctx = HookContext { raw: unsafe { &mut *fpr_ctx }, _marker: NotThreadSafe::new() };",
 ]
 
 
 def hook_params(params: str) -> str:
-    """Trait signature of an overflow hook: the handler signature without `&mut self`"""
-    return params.replace("&mut self, ", "", 1)
+    """Trait signature of an overflow hook: the handler signature without `&mut self`, over a `HookContext`"""
+    return params.replace("&mut self, ", "", 1).replace("ctx: &mut Context<'_>", "ctx: &mut HookContext<'_>", 1)
 
 
 def _entries_block(view: ComponentView) -> List[str]:

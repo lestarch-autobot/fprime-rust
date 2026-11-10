@@ -63,7 +63,7 @@ def generate(view: ComponentView) -> str:
         lines += ["", f"    fn {names.rust_cmd_handler(command)}({params}) -> CmdResponse {{",
                   f"        let _ = {unused};", "        CmdResponse::Ok", "    }"]
         if command.hook:
-            lines += ["", f"    fn {names.rust_overflow_hook(command)}(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse {{",
+            lines += ["", f"    fn {names.rust_overflow_hook(command)}(ctx: &mut HookContext<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse {{",
                       "        let _ = (ctx, opcode, cmd_seq);", "        CmdResponse::Busy", "    }"]
     lines += ["}", ""]
     return "\n".join(lines)

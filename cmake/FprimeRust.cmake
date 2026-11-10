@@ -27,7 +27,7 @@ endif()
 # System libraries the Rust std needs (cargo's `native-static-libs` is only known at build time, so the list is fixed
 # per platform; other platforms override it through the cache variable)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(_FPRIME_RUST_NATIVE_LIBS_DEFAULT pthread dl m gcc_s c)
+    set(_FPRIME_RUST_NATIVE_LIBS_DEFAULT pthread dl m rt util gcc_s c)  # rustc --print native-static-libs on glibc
 else()
     set(_FPRIME_RUST_NATIVE_LIBS_DEFAULT pthread dl m)
 endif()

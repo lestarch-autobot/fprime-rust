@@ -103,7 +103,7 @@ Generated-name table (component `Ns.Comp`, element `X`; FFI symbols are `fprime_
 | input port X (sync, guarded, async) | `X_handler(portNum, args)` | `X_handler` | `fn X_handler(&mut self, ctx: &mut Context<'_>, port_num, args) [-> R]` |
 | output port X | `X_out(portNum, args)` | `X_out` | `ctx.X_out(port_num, args) [-> R]` |
 | internal port X | `X_internalInterfaceHandler(args)` / `X_internalInterfaceInvoke(args)` | `X_internal_handler` / `X_internal_invoke` | `fn X_internal_handler(&mut self, ctx, args)` / `ctx.X_internal_invoke(args)` |
-| `hook` member X | `X_overflowHook(portNum, args)` / `X_cmdOverflowHook(opCode, cmdSeq)` | `X_overflow_hook` | `fn X_overflow_hook(ctx: &mut Context, …)` — no `&mut self`, no lock (template stub; command stub responds `BUSY`) |
+| `hook` member X | `X_overflowHook(portNum, args)` / `X_cmdOverflowHook(opCode, cmdSeq)` | `X_overflow_hook` | `fn X_overflow_hook(ctx: &mut HookContext, …)` — no `&mut self`, no lock; `HookContext` exposes `log_*` and `tlmWrite_*` only (template stub; command stub responds `BUSY`) |
 | command X (async, sync, guarded) | `X_cmdHandler(opCode, cmdSeq, args)` | `X_cmd_handler` | `fn X_cmd_handler(&mut self, ctx, args) -> CmdResponse` |
 | event X severity S | `log_S_X(args)` | `log_S_X` | `ctx.log_S_X(args)` |
 | telemetry X | `tlmWrite_X(v)` | `tlmWrite_X` | `ctx.tlmWrite_X(v)` |
@@ -134,7 +134,7 @@ builds it with `cargo build --profile <FPRIME_RUST_PROFILE> --target <FPRIME_RUS
 <bin>/fprime_rust/target` (every profile: `panic = "abort"`, `lto = true`, `overflow-checks = false`; lints
 `unsafe_op_in_unsafe_fn`, `clippy::unwrap_used`, `clippy::expect_used`, `clippy::indexing_slicing`,
 `clippy::arithmetic_side_effects` = deny), and links the single archive plus a fixed per-platform system-library list (`FPRIME_RUST_NATIVE_LIBS`, Linux default
-`pthread dl m gcc_s c`; cargo's `native-static-libs` is only known at build time, so a configure-time probe is future work — DEVELOPMENT ruling 5) `PRIVATE` into the executable. The shim's `extern "C"` references resolve at that final link, so
+`pthread dl m rt util gcc_s c` (what `rustc --print native-static-libs` reports on glibc); cargo's `native-static-libs` is only known at build time, so a configure-time probe is future work — DEVELOPMENT ruling 5) `PRIVATE` into the executable. The shim's `extern "C"` references resolve at that final link, so
 Rust std and the runtime exist once per executable; a component unit-test executable gets its own
 `libfprime_rust_<Comp>_ut.a` the same way (`FprimeRust.cmake` registers `target/fprime_rust` with both
 `register_fprime_target` and `register_fprime_ut_target`, so `register_fprime_ut` executables receive their own archive). There is no topology annotation (fprime-python marks the
@@ -193,8 +193,8 @@ shim takes the instance's non-recursive `Os::Mutex` in every FFI entry that rece
 `init` — with one exception generated per kind: on a `queued` component the async port, async command and
 internal-port entries take no lock, because they are reachable only through the drain below. Overflow hooks
 (`hook` ports, `hook` commands, internal-port hooks) are the one entry that never receives `&mut Implementation`:
-`fn X_overflow_hook(ctx: &mut Context, …)` runs on the caller's thread with no lock and may only use the
-`Context` (events, telemetry, a `BUSY` command response). The invoking handler may be holding
+`fn X_overflow_hook(ctx: &mut HookContext, …)` runs on the caller's thread with no lock; `HookContext` offers only
+events and telemetry (no output or internal ports, no parameters), and a command hook returns its response (`BUSY`). The invoking handler may be holding
 `&mut Implementation` at that moment, so a second reference would be undefined behaviour (DEVELOPMENT ruling 6).
 Queued dispatch
 (no Rust-visible primitive): every generated sync/guarded entry of a queued component takes the lock once,

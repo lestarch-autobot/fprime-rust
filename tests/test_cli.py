@@ -74,4 +74,4 @@ def test_multiline_hook_command_generates_the_overflow_hook(tmp_path: Path):
                        "    @ Set it\n    async command SET(\n      limit: U32 @< the limit\n    ) opcode 0 hook\n  }\n}\n")
     assert main(cli(tmp_path, unit)) == 0
     base = (tmp_path / "out" / "multi_base.rs").read_text()
-    assert "fn SET_overflow_hook(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;" in base
+    assert "fn SET_overflow_hook(ctx: &mut HookContext<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;" in base

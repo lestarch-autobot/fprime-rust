@@ -228,8 +228,12 @@ def test_overflow_hooks_never_borrow_the_implementation(build_dir: Path, tmp_pat
     assert hooks, "the Rich fixture declares hook members"
     for block in hooks:
         assert "fpr_impl" not in block and "&mut *(" not in block
-        assert "Implementation::" in block
+        assert "Implementation::" in block and "HookContext {" in block
     assert "_overflow_hook(&mut self" not in base
+    start = base.index("impl<'call> HookContext")
+    hook_ctx = base[start:base.index("\n}\n", start)]
+    assert "pub fn log_" in hook_ctx and "pub fn tlmWrite_" in hook_ctx
+    assert "_out(" not in hook_ctx and "_internal_invoke(" not in hook_ctx and "paramGet_" not in hook_ctx
     for line in cpp.splitlines():
         if "_overflow_hook(" in line and "::" not in line:
             assert "this->m_impl" not in line

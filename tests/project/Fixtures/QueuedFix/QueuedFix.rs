@@ -57,7 +57,7 @@ impl Component for QueuedFix {
         }
     }
 
-    fn aIn_overflow_hook(_ctx: &mut Context<'_>, _port_num: FwIndexType, x: u32) {
+    fn aIn_overflow_hook(_ctx: &mut HookContext<'_>, _port_num: FwIndexType, x: u32) {
         trace(900 + x);
     }
 
@@ -76,7 +76,7 @@ impl Component for QueuedFix {
         trace(300 + x);
     }
 
-    fn ip_overflow_hook(_ctx: &mut Context<'_>, x: u32) {
+    fn ip_overflow_hook(_ctx: &mut HookContext<'_>, x: u32) {
         trace(700 + x);
     }
 
@@ -85,7 +85,7 @@ impl Component for QueuedFix {
         CmdResponse::Ok
     }
 
-    fn AC_overflow_hook(_ctx: &mut Context<'_>, _opcode: FwOpcodeType, _cmd_seq: u32) -> CmdResponse {
+    fn AC_overflow_hook(_ctx: &mut HookContext<'_>, _opcode: FwOpcodeType, _cmd_seq: u32) -> CmdResponse {
         CmdResponse::Busy
     }
 }
