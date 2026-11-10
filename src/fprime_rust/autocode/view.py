@@ -185,15 +185,17 @@ def _queue_full_hook(node) -> bool:
     """Whether a specifier selects the `hook` queue-full behavior
 
     fprime-fpp-python 4.0.1 exposes `queue_full` on internal port specifiers only; for general ports and
-    commands the trailing queue-full keyword is read from the specifier's own source text.
+    commands the trailing queue-full keyword is read from the specifier's own source text, which may span lines
+    (comments and `@<` annotations are removed per line first).
     """
     queue_full = getattr(node, "queue_full", None)
     if queue_full is not None:
         return variant_name(queue_full) == "Hook"
     if not hasattr(node, "span"):
         return False
-    text = _spec_text(node).split("#", 1)[0].split("@<", 1)[0].strip()
-    return text.split()[-1] == "hook" if text else False
+    code = " ".join(line.split("#", 1)[0].split("@<", 1)[0] for line in _spec_text(node).splitlines())
+    tokens = code.split()
+    return bool(tokens) and tokens[-1] == "hook"
 
 
 @dataclass

@@ -66,3 +66,12 @@ def test_ref_port_parameter_is_rejected(tmp_path: Path, capsys):
     unit = module_with(tmp_path, "module Fx {\n  port Rp(ref v: U32)\n  @ fprime-rust\n  passive component Bad {\n    sync input port r: Rp\n  }\n}\n")
     assert main(cli(tmp_path, unit)) == 1
     assert "ref port parameter" in capsys.readouterr().err
+
+
+def test_multiline_hook_command_generates_the_overflow_hook(tmp_path: Path):
+    unit = module_with(tmp_path, "module Fx {\n  @ fprime-rust\n  active component Multi {\n    command recv port cmdIn\n"
+                       "    command reg port cmdRegOut\n    command resp port cmdResponseOut\n"
+                       "    @ Set it\n    async command SET(\n      limit: U32 @< the limit\n    ) opcode 0 hook\n  }\n}\n")
+    assert main(cli(tmp_path, unit)) == 0
+    base = (tmp_path / "out" / "multi_base.rs").read_text()
+    assert "fn SET_overflow_hook(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;" in base
