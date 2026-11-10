@@ -7,6 +7,7 @@ Both accept ``--dry-run`` to list the files that would be written, one per line,
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List
@@ -17,8 +18,18 @@ from .model import ModelError, load_module_model
 from .view import ModelView, UnsupportedElement
 
 
+ANNOTATION = re.compile(r"^\s*@\s*fprime-rust\s*$", re.MULTILINE)
+
+
+def has_rust_component(units: List[Path]) -> bool:
+    """Cheap pre-filter: a module without an `@ fprime-rust` annotation never loads the model (a no-op)"""
+    return any(ANNOTATION.search(unit.read_text(encoding="utf-8", errors="replace")) for unit in units if unit.is_file())
+
+
 def bindings_files(build_dir: Path, output: Path, prefixes: List[Path], units: List[Path]) -> Dict[Path, str]:
     """Generated files of a module as {path: content}; the user template seed is included only when absent"""
+    if not has_rust_component(units):
+        return {}
     model = load_module_model(build_dir, units)
     model_name = ", ".join(unit.name for unit in units)
     files: Dict[Path, str] = {}
@@ -36,6 +47,8 @@ def bindings_files(build_dir: Path, output: Path, prefixes: List[Path], units: L
 
 def component_specs(build_dir: Path, output: Path, prefixes: List[Path], units: List[Path]) -> List[str]:
     """``Ns.Comp=<base.rs>=<Comp.rs>`` of every Rust component in the module, for the ``crate`` subcommand"""
+    if not has_rust_component(units):
+        return []
     model = load_module_model(build_dir, units)
     return [f"{view.qualified_name}={output / (view.base_module + '.rs')}={user_file_for(view.name, units)}"
             for view in ModelView(model, prefixes).views()]

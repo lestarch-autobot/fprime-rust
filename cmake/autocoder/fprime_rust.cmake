@@ -34,8 +34,12 @@ function(fprime_rust_setup_autocode MODULE_NAME AC_INPUT_FILES)
     execute_process(
         COMMAND "${FPRIME_RUST_AC}" "bindings" ${COMMON_ARGUMENTS} "--dry-run"
         OUTPUT_VARIABLE GENERATED_FILES_RAW
-        COMMAND_ERROR_IS_FATAL ANY
+        ERROR_VARIABLE GENERATED_FILES_ERROR
+        RESULT_VARIABLE GENERATED_FILES_RESULT
     )
+    if (NOT GENERATED_FILES_RESULT EQUAL 0)
+        message(FATAL_ERROR "[fprime_rust] fprime-rust-ac failed for ${MODULE_NAME}:\n${GENERATED_FILES_ERROR}")
+    endif()
     string(REPLACE "\n" ";" GENERATED_FILES_LIST "${GENERATED_FILES_RAW}")
     list(FILTER GENERATED_FILES_LIST EXCLUDE REGEX "^$")
     set(GENERATED_BUILD_FILES "${GENERATED_FILES_LIST}")
@@ -63,6 +67,9 @@ function(fprime_rust_setup_autocode MODULE_NAME AC_INPUT_FILES)
         string(REPLACE "\n" ";" COMPONENT_SPECS "${COMPONENT_SPECS_RAW}")
         list(FILTER COMPONENT_SPECS EXCLUDE REGEX "^$")
         append_list_property("${COMPONENT_SPECS}" TARGET "${MODULE_NAME}" PROPERTY FPRIME_RUST_COMPONENTS)
+        # The executable's Rust archive (its FPRIME_RUST_ARCHIVE property, set by target/fprime_rust) is linked
+        # right after this module so the shim objects defining the helpers it references precede it
+        target_link_libraries("${MODULE_NAME}" INTERFACE "$<TARGET_PROPERTY:FPRIME_RUST_ARCHIVE>" FprimeRust)
         fprime_rust_get_model_files()
         add_custom_command(
             OUTPUT ${GENERATED_BUILD_FILES}

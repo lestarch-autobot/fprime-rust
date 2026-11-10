@@ -400,7 +400,10 @@ def generate_cpp(view: ComponentView, model_name: str) -> str:
     for namespace in view.namespaces:
         lines.append(f"namespace {namespace} {{")
     lines += ["",
-              f"{cls}::{cls}(const char* const compName) : {view.base_class}(compName), m_impl({names.lifecycle(view, 'new')}()), m_mutex() {{}}",
+              f"{cls}::{cls}(const char* const compName) : {view.base_class}(compName), m_impl({names.lifecycle(view, 'new')}()), m_mutex() {{",
+              "    // Pull the C++ runtime (assert bridge) into the link ahead of the Rust archive (REQ-FprimeRust-020)",
+              "    static_cast<void>(fprime_rust_runtime_marker());",
+              "}",
               "",
               f"{cls}::~{cls}() {{",
               f"    {names.lifecycle(view, 'drop')}(this->m_impl);",

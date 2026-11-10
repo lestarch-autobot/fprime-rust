@@ -99,8 +99,9 @@ function(fprime_rust_link_archive EXECUTABLE FULL_DEPENDENCIES)
     add_custom_target("${EXECUTABLE}_fprime_rust" DEPENDS "${ARCHIVE}")
     add_dependencies("${EXECUTABLE}_fprime_rust" ${COMPONENT_MODULES})
     add_dependencies("${EXECUTABLE}" "${EXECUTABLE}_fprime_rust")
-    # The archive follows the module libraries (whose shim objects define the helpers it references) and is
-    # followed by the C++ runtime and the system libraries Rust's std needs
-    target_link_libraries("${EXECUTABLE}" PRIVATE "${ARCHIVE}" FprimeRust ${FPRIME_RUST_SYSTEM_LIBRARIES})
+    # The archive is linked through each Rust module's INTERFACE link (autocoder/fprime_rust) so it follows the
+    # shim objects defining the helpers it references; the runtime and Rust std's system libraries follow
+    set_property(TARGET "${EXECUTABLE}" PROPERTY FPRIME_RUST_ARCHIVE "${ARCHIVE}")
+    target_link_libraries("${EXECUTABLE}" PRIVATE FprimeRust ${FPRIME_RUST_SYSTEM_LIBRARIES})
     message(STATUS "[fprime_rust] ${EXECUTABLE} links ${ARCHIVE}")
 endfunction(fprime_rust_link_archive)
