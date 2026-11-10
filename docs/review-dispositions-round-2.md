@@ -44,4 +44,4 @@ No `disagree` rows this round. No `deferred-to-DEVELOPMENT` rows: the two DEVELO
 
 ## New elicitation findings (author, round 2)
 
-- **N-5** The `prmdb_record_equals` helper reads the record file through `ctx.record_path(path)`; fth v0.1.2's helper `ctx` exposes `ctx.window` (channels/events) and the design assumes a record-relative path accessor exists or is added when DEVELOPMENT implements the helper. If fth exposes no record-root accessor, the helper needs an fth change (tooling pin = plan change). Recommended ruling: DEVELOPMENT confirms on the dry run; if absent, add the accessor to fth before the first run-for-record.
+- none (N-5, raised here in round 2, was answered by the round-3 system-test record: fth v0.1.2 exposes `ctx.record.path`; withdrawn).
