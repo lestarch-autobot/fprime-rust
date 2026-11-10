@@ -75,3 +75,13 @@ def test_multiline_hook_command_generates_the_overflow_hook(tmp_path: Path):
     assert main(cli(tmp_path, unit)) == 0
     base = (tmp_path / "out" / "multi_base.rs").read_text()
     assert "fn SET_overflow_hook(ctx: &mut HookContext<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;" in base
+
+
+def test_runtime_enum_types_are_not_regenerated(tmp_path: Path):
+    """Fw.ParamValid telemetry uses the runtime crate's ParamValid; no clashing enum block"""
+    unit = module_with(tmp_path, "module Fx {\n  @ fprime-rust\n  passive component Pv {\n    telemetry port tlmOut\n    time get port timeCaller\n"
+                       "    telemetry V: Fw.ParamValid\n  }\n}\n")
+    assert main(cli(tmp_path, unit)) == 0
+    base = (tmp_path / "out" / "pv_base.rs").read_text()
+    assert "pub enum ParamValid" not in base
+    assert "pub fn tlmWrite_V(&mut self, value: ParamValid)" in base

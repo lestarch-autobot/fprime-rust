@@ -76,6 +76,8 @@ def encode_args(params: List[Param]) -> List[str]:
 def _enum_block(view: ComponentView) -> List[str]:
     lines: List[str] = []
     for info in view.enums:
+        if info.runtime:
+            continue  # `pub use fprime_rust::...` already provides it
         lines += ["", f"/// FPP enum `{info.qualified_name}`", f"#[repr({info.repr})]",
                   "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]", f"pub enum {info.rust_name} {{"]
         lines += [f"    {name} = {value}," for name, value in info.constants]

@@ -60,6 +60,11 @@ class EnumInfo:
     repr: str               # Rust repr integer type
     cpp_name: str           # C++ class name, e.g. Fx::Mode
     constants: List[tuple]  # (name, value)
+    runtime: bool = False   # provided by the fprime_rust runtime crate (Fw.ParamValid, Fw.CmdResponse): no enum block
+
+
+# FPP enums the runtime crate already defines; generating them again would clash with the base module's re-exports
+RUNTIME_ENUMS = {"Fw.ParamValid": "ParamValid", "Fw.CmdResponse": "CmdResponse"}
 
 
 @dataclass(frozen=True)
@@ -317,12 +322,14 @@ class ModelView:
                 # Value.EnumConstant.value is the (name, integer) pair of the constant
                 value = self.analysis.value_map[constant.node_id].value
                 constants.append((constant.name, int(value[1] if isinstance(value, tuple) else value)))
+            runtime_name = RUNTIME_ENUMS.get(symbol.qualified_name)
             self._enums[symbol.qualified_name] = EnumInfo(
                 qualified_name=symbol.qualified_name,
-                rust_name=self.enum_rust_name(symbol.qualified_name),
+                rust_name=runtime_name or self.enum_rust_name(symbol.qualified_name),
                 repr=INTEGER_RUST[enum_type.rep_type.name],
                 cpp_name=cpp_name(symbol.qualified_name),
                 constants=constants,
+                runtime=runtime_name is not None,
             )
         return self._enums[symbol.qualified_name]
 

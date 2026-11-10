@@ -56,6 +56,16 @@ impl CmdResponse {
         self as u32
     }
 
+    /// FFI carrier (generated-enum interface)
+    pub const fn repr(self) -> u32 {
+        self as u32
+    }
+
+    /// Decode the FFI carrier (generated-enum interface)
+    pub const fn from_repr(value: u32) -> Option<Self> {
+        Self::from_code(value)
+    }
+
     /// Decode an F Prime integer code
     pub const fn from_code(code: u32) -> Option<Self> {
         match code {
@@ -88,6 +98,19 @@ impl ParamValid {
     /// The F Prime integer code
     pub const fn code(self) -> u8 {
         self as u8
+    }
+
+    /// FFI carrier (generated-enum interface)
+    pub const fn repr(self) -> u8 {
+        self as u8
+    }
+
+    /// Decode the FFI carrier (generated-enum interface): `Fw::ParamValid` has exactly these four codes
+    pub const fn from_repr(value: u8) -> Option<Self> {
+        match value {
+            0 | 1 | 2 | 3 => Some(Self::from_code(value)),
+            _ => None,
+        }
     }
 
     /// Decode an F Prime integer code; unknown codes decode as `Invalid`
