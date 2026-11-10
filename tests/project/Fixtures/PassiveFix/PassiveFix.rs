@@ -139,7 +139,10 @@ impl Component for PassiveFix {
         CmdResponse::Ok
     }
 
-    fn PANIC_cmd_handler(&mut self, _ctx: &mut Context<'_>) -> CmdResponse {
-        panic!("fixture panic")
+    fn PANIC_cmd_handler(&mut self, _ctx: &mut Context<'_>, really: bool) -> CmdResponse {
+        if really {
+            panic!("fixture panic")
+        }
+        CmdResponse::Ok
     }
 }

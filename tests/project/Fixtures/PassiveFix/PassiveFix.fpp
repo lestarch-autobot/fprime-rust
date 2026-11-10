@@ -31,8 +31,8 @@ module Fix {
     sync command TLM_ALL(x: U32)
     @ reads P_U32 / P_NODEF into T_PRM, T_VALID / T_PRM2, T_VALID2
     sync command PRM
-    @ panics in Rust
-    sync command PANIC
+    @ panics in Rust when `really` is set; otherwise responds OK (covers the handler without aborting)
+    sync command PANIC(really: bool)
 
     telemetry T_U32: U32
     telemetry T_I8: I8

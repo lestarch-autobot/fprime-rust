@@ -11,6 +11,8 @@ SHIM_TEST(UT_SHIM_7_oneEventPerSeverity)
 SHIM_TEST(UT_SHIM_8_telemetryRowsAndParamGet)
 SHIM_TEST(UT_SHIM_10_stringTruncationNulAndInvalidUtf8)
 
+TEST(Nominal, panicDisarmedRespondsOk) { Fix::PassiveFixTester().panicDisarmedRespondsOk(); }
+
 TEST(Death, UT_SHIM_7_panicReachesFprimeAssert) {
     // the panic location (file:line in Rust) reaches FW_ASSERT and the process aborts
     ASSERT_DEATH(Fix::PassiveFixTester().panicInHandler(), "PassiveFix\\.rs:[0-9]+");

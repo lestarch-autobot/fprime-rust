@@ -1,6 +1,7 @@
 // UT-SHIM-5 (active) over the active fixture
 #include "Fixtures/ActiveFix/test/ut/ActiveFixTester.hpp"
 
+TEST(Nominal, numMsgsDroppedReadable) { Fix::ActiveFixTester().numMsgsDroppedReadable(); }
 TEST(Nominal, UT_SHIM_3_guardedCallerSerializedAgainstAsyncHandler) {
     Fix::ActiveFixTester().UT_SHIM_3_guardedCallerSerializedAgainstAsyncHandler();
 }

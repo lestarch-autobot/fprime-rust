@@ -7,6 +7,7 @@
 // ======================================================================
 
 #include "PassiveFixTester.hpp"
+#include "Fw/Test/UnitTest.hpp"
 
 namespace Fix {
 
@@ -149,7 +150,16 @@ void PassiveFixTester::UT_SHIM_10_stringTruncationNulAndInvalidUtf8() {
 }
 
 void PassiveFixTester::panicInHandler() {
-    this->sendCmd_PANIC(0, 1);
+    this->sendCmd_PANIC(0, 1, true);
+}
+
+void PassiveFixTester::panicDisarmedRespondsOk() {
+    REQUIREMENT("REQ-FprimeRust-012");
+    COMMENT("passive fixture: PANIC(false) runs the sync command shim path and responds OK without aborting");
+    this->clearHistory();
+    this->sendCmd_PANIC(0, 2, false);
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_CMD_RESPONSE(0, PassiveFix::OPCODE_PANIC, 2, Fw::CmdResponse::OK);
 }
 
 }  // namespace Fix

@@ -66,4 +66,14 @@ void ActiveFixTester::UT_SHIM_5_activeDispatchesPortAndCommand() {
     ASSERT_CMD_RESPONSE(0, ActiveFix::OPCODE_AC, 3, Fw::CmdResponse::OK);
 }
 
+void ActiveFixTester::numMsgsDroppedReadable() {
+    REQUIREMENT("REQ-FprimeRust-012");
+    COMMENT("active fixture: a guarded handler publishes getNumMsgsDropped() read through ctx.num_msgs_dropped(); zero before any overflow");
+    this->clearHistory();
+    this->invoke_to_gIn(0, 9);
+    ASSERT_TLM_T_X(0, 9);
+    ASSERT_TLM_T_DROPPED_SIZE(1);
+    ASSERT_TLM_T_DROPPED(0, 0);
+}
+
 }  // namespace Fix

@@ -46,6 +46,8 @@ public:
 
   //! To do
   void UT_SHIM_3_guardedCallerSerializedAgainstAsyncHandler();
+  //! guarded handler reads getNumMsgsDropped through the Rust context (no drops yet)
+  void numMsgsDroppedReadable();
   void UT_SHIM_5_activeDispatchesPortAndCommand();
 
 private:

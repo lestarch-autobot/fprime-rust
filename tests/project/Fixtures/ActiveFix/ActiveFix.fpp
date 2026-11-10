@@ -18,6 +18,8 @@ module Fix {
     async command AC(x: U32)
 
     telemetry T_X: U32
+    @ getNumMsgsDropped as seen from Rust (covers the num_msgs_dropped helper)
+    telemetry T_DROPPED: U32
     event E_X(x: U32) severity activity low format "{}"
   }
 }
