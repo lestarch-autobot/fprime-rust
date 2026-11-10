@@ -32,7 +32,7 @@ else()
     set(_FPRIME_RUST_NATIVE_LIBS_DEFAULT pthread dl m)
 endif()
 set(FPRIME_RUST_NATIVE_LIBS "${_FPRIME_RUST_NATIVE_LIBS_DEFAULT}" CACHE STRING
-    "System libraries linked after the Rust archive (cargo native-static-libs equivalent)")
+    "System libraries the Rust std needs, linked with the executable (cargo native-static-libs equivalent)")
 set(FPRIME_RUST_SYSTEM_LIBRARIES ${FPRIME_RUST_NATIVE_LIBS})
 message(STATUS "[fprime_rust] cargo: ${FPRIME_RUST_CARGO}; target: ${FPRIME_RUST_TARGET}; profile: ${FPRIME_RUST_PROFILE}")
 register_fprime_target(target/fprime_rust)
