@@ -10,7 +10,7 @@ that operators familiar with one feel at home in the other.
 > **Status:** Experimental.  The MVP supports primitive-typed commands, events,
 > telemetry, and parameters.  Richer FPP types (arrays, structs, enums) can
 > be added without API churn -- see
-> [`docs/design.md`](docs/design.md) for the extension surface.
+> [`docs/sdd.md`](docs/sdd.md) for the extension surface.
 
 ## Why?
 
@@ -88,8 +88,7 @@ fprime-rust/
 │   ├── Cargo.toml
 │   └── src/lib.rs
 └── docs/
-    ├── design.md                     # software design description
-    └── architecture.md               # tooling overview
+    └── sdd.md                        # software design description (requirements, design, tests)
 ```
 
 ## Setup
@@ -138,15 +137,15 @@ It demonstrates one of each:
 
 ## Documentation
 
-- [`docs/design.md`](docs/design.md) -- detailed software design description.
-- [`docs/architecture.md`](docs/architecture.md) -- block-level overview and
+- [`docs/sdd.md`](docs/sdd.md) -- software design description: requirements, design, tests.
+- (folded into `docs/sdd.md`) -- block-level overview and
   data flow.
 
 ## Limitations / future work
 
 - **Type support**: currently primitive FPP types only (`U8`-`U64`, `I8`-`I64`,
   `F32`/`F64`, `bool`).  Strings, arrays, enums, and structs are tracked in
-  `docs/design.md`.
+  `docs/sdd.md`.
 - **Async commands**: command-handler dispatch is synchronous from the Rust
   side; long-running operations should off-load to dedicated worker tasks.
 - **Unit tests**: the autocoder has Python unit tests

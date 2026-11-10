@@ -15,7 +15,7 @@ The runtime intentionally exports a tiny surface:
 
 The actual FFI symbols (`rust_<comp>_*`, `extern "C"` blocks) live in the
 per-component generated module so the linker can deduplicate them.  See
-`../docs/design.md` for the architectural rationale.
+`../docs/sdd.md` for the architectural rationale.
 
 [`CmdResponse`]: src/lib.rs
 [`ParamValid`]: src/lib.rs
