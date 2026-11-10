@@ -33,7 +33,7 @@ FwSizeType fix_passive_trace(U32* out, FwSizeType capacity);
 // Handlers for typed from ports
 // ----------------------------------------------------------------------
 
-U32 PassiveFixTester::from_vOut_handler(FwIndexType portNum, U32 a, Fw::StringBase& s, const Fix::Mode& m) {
+U32 PassiveFixTester::from_vOut_handler(FwIndexType portNum, U32 a, const Fw::StringBase& s, const Fix::Mode& m) {
     this->pushFromPortEntry_vOut(a, s, m);
     return 100;
 }

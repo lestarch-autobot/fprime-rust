@@ -125,7 +125,7 @@ def test_type_table(build_dir: Path):
     v_in = by_name(view.input_ports, "vIn")
     a, s, m = v_in.params
     assert (a.type.rust, a.type.cpp) == ("u32", "U32")
-    assert (s.type.rust, s.type.cpp, s.type.string_size, s.is_ref) == ("&str", "Fw::StringBase", "20", True)
+    assert (s.type.rust, s.type.cpp, s.type.string_size, s.is_ref) == ("&str", "Fw::StringBase", "20", False)
     assert (m.type.rust, m.type.kind, m.type.cpp) == ("Mode", "enum", "Fx::Mode"), "type-table row `enum E` -> `E`"
     assert v_in.returns.rust == "u32", "alias `type Count = U32` maps to u32"
     assert by_name(view.channels, "T1").type.rust == "f64"

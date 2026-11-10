@@ -1,7 +1,7 @@
 module Fx {
   enum Mode : U8 { OFF, ON }
   type Count = U32
-  port Val(a: U32, ref s: string size 20, m: Mode) -> Count
+  port Val(a: U32, s: string size 20, m: Mode) -> Count
   port Str(s: string)
   @ fprime-rust
   queued component Rich {

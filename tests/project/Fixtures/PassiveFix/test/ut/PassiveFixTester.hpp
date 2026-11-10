@@ -53,7 +53,7 @@ public:
 
 private:
   //! Returns 100 so the Rust caller's `+ 1` is observable
-  U32 from_vOut_handler(FwIndexType portNum, U32 a, Fw::StringBase& s, const Fix::Mode& m) override;
+  U32 from_vOut_handler(FwIndexType portNum, U32 a, const Fw::StringBase& s, const Fix::Mode& m) override;
 
 private:
   // ----------------------------------------------------------------------

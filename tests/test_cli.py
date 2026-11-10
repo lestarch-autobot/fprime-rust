@@ -60,3 +60,9 @@ def test_unsized_string_read_into_rust_is_rejected(tmp_path: Path, capsys, body:
     unit = module_with(tmp_path, f"module Fx {{\n  port Ret -> string\n  @ fprime-rust\n  passive component Bad {{\n    {body}\n  }}\n}}\n")
     assert main(cli(tmp_path, unit)) == 1
     assert "unsized string" in capsys.readouterr().err
+
+
+def test_ref_port_parameter_is_rejected(tmp_path: Path, capsys):
+    unit = module_with(tmp_path, "module Fx {\n  port Rp(ref v: U32)\n  @ fprime-rust\n  passive component Bad {\n    sync input port r: Rp\n  }\n}\n")
+    assert main(cli(tmp_path, unit)) == 1
+    assert "ref port parameter" in capsys.readouterr().err

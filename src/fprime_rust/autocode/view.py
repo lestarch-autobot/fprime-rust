@@ -351,9 +351,12 @@ class ModelView:
         raise UnsupportedElement(owner, f"type {name} is not carried over the C ABI in this release")
 
     def params(self, formal_params, owner: str, carrier: StringCarrier) -> List[Param]:
+        """`ref` parameters are rejected: a value copied over the C ABI cannot write back to the caller"""
+        for param in formal_params:
+            if variant_name(param.kind) == "Ref":
+                raise UnsupportedElement(f"{owner}.{param.name}", "ref port parameter has no write-back across the C ABI")
         return [
-            Param(param.name, self.type_info(self.resolve_type(param.type_name), f"{owner}.{param.name}", carrier),
-                  is_ref=variant_name(param.kind) == "Ref")
+            Param(param.name, self.type_info(self.resolve_type(param.type_name), f"{owner}.{param.name}", carrier))
             for param in formal_params
         ]
 
