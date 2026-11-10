@@ -2,56 +2,78 @@
 
 ## Introduction
 
-`fprime-rust` lets an F Prime component be implemented in Rust. The component stays an FPP model; a
-single annotation marks it as Rust-implemented; the `fprime-rust-ac` autocoder emits the C++ shim that
-plugs into the standard autocoded component base, a generated Rust base module (the typed handler
-trait and the `Context` helpers), and a user template. One deployment-level Cargo workspace compiles
-every Rust component of a deployment and the runtime into one static archive linked once into the
-executable. The user writes the `.fpp` and the `.rs`; no `.cpp`/`.hpp` is written by hand.
+`fprime-rust` lets an F Prime component be implemented in Rust. The component stays an FPP model; the
+annotation `@ fprime-rust` marks it as Rust-implemented; the `fprime-rust-ac` autocoder emits the C++
+shim that plugs into the standard autocoded component base, a generated Rust base module (the typed
+handler trait and the `Context` helpers), and a user template. One deployment-level Cargo workspace
+compiles every Rust component of a deployment and the runtime into one static archive linked once into
+the executable. The user writes the `.fpp` and the `.rs`; no `.cpp`/`.hpp` is written by hand.
 
 ## Requirements
 
 | ID | Requirement | Verification |
 |---|---|---|
-| REQ-FprimeRust-001 | A component annotated `@ fprime-rust` in FPP shall be generated with a Rust implementation surface. | Unit Test |
-| REQ-FprimeRust-002 | The autocoder shall load the FPP model by in-process analysis of the module's translation units and their closure. | Unit Test |
+| REQ-FprimeRust-001 | The autocoder shall generate Rust and C++ sources for a component if and only if it carries `@ fprime-rust`. | Unit Test |
+| REQ-FprimeRust-002 | The autocoder shall obtain the model from `fprime-fpp-python` analysis of the module's translation units and closure, reading or writing no JSON model. | Unit Test |
 | REQ-FprimeRust-003 | The autocoder shall read the FPP closure from the module build cache `fpp-cache/stdout.txt`. | Unit Test |
 | REQ-FprimeRust-004 | The autocoder shall fail with the FPP diagnostics when the model does not analyze cleanly. | Unit Test |
 | REQ-FprimeRust-005 | The autocoder shall generate, per component, a C++ shim deriving from the autocoded component base. | Unit Test |
 | REQ-FprimeRust-006 | The autocoder shall generate, per component, a Rust base module declaring the handler trait and `Context`. | Unit Test |
 | REQ-FprimeRust-007 | The autocoder shall generate a user template `<Name>.template.rs` and seed `<Name>.rs` when absent. | Unit Test |
-| REQ-FprimeRust-008 | Active, queued and passive components shall be supported. | Integration Test: L2-1, L2-4, L2-5 |
-| REQ-FprimeRust-009 | Typed input ports (sync, guarded, async) shall dispatch to a Rust handler per port. | Integration Test: L2-3, L2-4 |
-| REQ-FprimeRust-010 | Typed output ports shall be invocable from Rust through `Context`. | Integration Test: L2-3, L7-1 |
-| REQ-FprimeRust-011 | Ports between a Rust component and a C++ component shall work in both directions. | Integration Test: L2-3, L2-4, L7-1 |
-| REQ-FprimeRust-012 | Commands (async, sync, guarded) shall dispatch to a Rust handler that returns the command response. | Integration Test: L2-1, L2-5, L6-1 |
-| REQ-FprimeRust-013 | Events of every severity shall be emittable from Rust with their FPP arguments. | Integration Test: L2-1, L2-5, L5-1, L6-1 |
-| REQ-FprimeRust-014 | Telemetry channels shall be writable from Rust. | Integration Test: L2-1, L2-4, L4-1 |
-| REQ-FprimeRust-015 | Parameters shall be readable from Rust with their validity, and updates shall be notified. | Integration Test: L2-2, L5-1 |
-| REQ-FprimeRust-016 | Primitive, boolean, enumeration and bounded-string FPP types shall map to Rust types. | Unit Test |
-| REQ-FprimeRust-017 | An unsupported FPP element shall fail generation naming the element. | Unit Test |
-| REQ-FprimeRust-018 | A deployment shall link exactly one Rust static archive containing every Rust component and the runtime. | Unit Test |
-| REQ-FprimeRust-019 | Rust components of a deployment shall compile as members of one generated Cargo workspace. | Unit Test |
-| REQ-FprimeRust-020 | The CMake integration shall register the Rust target between `FPrime.cmake` and `fprime_setup_included_code`. | Inspection |
-| REQ-FprimeRust-021 | A Rust component's CMakeLists shall list only its `.fpp` and `.rs` files. | Inspection |
+| REQ-FprimeRust-008 | A `@ fprime-rust` component of kind active, queued or passive shall dispatch its handlers to Rust. | Unit Test; Integration Test: L2-1, L2-4, L2-5 |
+| REQ-FprimeRust-009 | Each typed input port (sync, guarded, async) shall dispatch to a Rust handler with its FPP arguments. | Unit Test; Integration Test: L2-3, L2-4 |
+| REQ-FprimeRust-010 | A Rust handler shall be able to invoke each typed output port of its component with its FPP arguments. | Unit Test; Integration Test: L2-3, L7-1 |
+| REQ-FprimeRust-011 | A port invoked by a C++ component shall reach the Rust handler, and a port invoked from Rust shall reach the C++ handler, with arguments unchanged. | Integration Test: L2-3, L2-4, L7-1 |
+| REQ-FprimeRust-012 | Each command (async, sync, guarded) shall dispatch to a Rust handler whose returned response is sent as the command response. | Unit Test; Integration Test: L2-1, L2-5, L6-1 |
+| REQ-FprimeRust-013 | Each event of the component shall be emittable from Rust with its FPP arguments at its declared severity. | Unit Test; Integration Test: L2-1, L2-5, L5-1, L6-1 |
+| REQ-FprimeRust-014 | Each telemetry channel of the component shall be writable from Rust. | Unit Test; Integration Test: L2-1, L2-4, L4-1 |
+| REQ-FprimeRust-015 | A Rust handler shall read each parameter of its component with its validity. | Unit Test; Integration Test: L2-2, L5-1, L7-1 |
+| REQ-FprimeRust-016 | FPP types shall map to Rust types per the type-mapping table. | Unit Test |
+| REQ-FprimeRust-017 | An FPP element in the rejected-element table shall fail generation with a diagnostic naming the element. | Unit Test |
+| REQ-FprimeRust-018 | A deployment executable shall contain exactly one copy of the Rust runtime and link with no duplicate Rust symbol definitions. | Inspection |
+| REQ-FprimeRust-020 | A deployment that includes `FprimeRust` after `FPrime.cmake` and before `fprime_setup_included_code()` shall build its Rust components. | Unit Test |
+| REQ-FprimeRust-021 | A Rust component shall build from a module registering only its `.fpp` and `.rs` sources. | Unit Test |
 | REQ-FprimeRust-022 | The autocoder shall rerun when any translation unit or closure file changes. | Unit Test |
 | REQ-FprimeRust-023 | Handlers of one component instance shall never run concurrently on its Rust state. | Unit Test |
-| REQ-FprimeRust-024 | A Rust panic shall terminate the deployment like a failed assertion. | Unit Test |
+| REQ-FprimeRust-024 | A Rust panic shall report its message and location through the F Prime assertion hook and abort the process. | Unit Test |
 | REQ-FprimeRust-025 | The Rust implementation shall be constructed once at instantiation and dropped at destruction. | Unit Test |
-| REQ-FprimeRust-026 | Generated names shall follow the F Prime C++ handler and helper names. | Unit Test |
+| REQ-FprimeRust-026 | Generated C++ and Rust names shall match the generated-name table. | Unit Test |
 | REQ-FprimeRust-027 | A cookiecutter shall create a Rust component with `.fpp`, `.rs`, CMakeLists and `docs/sdd.md`. | Unit Test |
-| REQ-FprimeRust-028 | Generated artifacts shall be reproducible for an unchanged model. | Unit Test |
-| REQ-FprimeRust-029 | The deployment shall run the Rust components through command, event, telemetry and parameter paths end to end. | Integration Test: L2-1, L2-2, L4-1, L7-1 |
+| REQ-FprimeRust-028 | Two generations from an unchanged model shall produce byte-identical files. | Unit Test |
+| REQ-FprimeRust-030 | A parameter update shall invoke the component's Rust parameter-updated handler with the parameter id. | Unit Test |
+| REQ-FprimeRust-031 | Each internal port shall dispatch to a Rust handler and be invocable from Rust. | Unit Test |
+| REQ-FprimeRust-032 | Each `hook` queue-full member shall dispatch its overflow hook to Rust. | Unit Test |
+| REQ-FprimeRust-033 | A typed input port with a return type shall return the Rust handler's value to the caller. | Unit Test |
+| REQ-FprimeRust-034 | The autocoder shall fail naming the cache path when `fpp-cache/stdout.txt` is missing, empty or lists an unreadable file. | Unit Test |
+| REQ-FprimeRust-035 | The build shall fail at configure naming `FPRIME_RUST_CARGO` when cargo is not found. | Unit Test |
+| REQ-FprimeRust-036 | A Rust compile error shall fail the deployment build with the cargo diagnostics. | Unit Test |
+| REQ-FprimeRust-037 | A Rust string longer than its carrier capacity shall be stored truncated to that capacity, and bytes after an interior NUL shall be dropped. | Unit Test |
+| REQ-FprimeRust-038 | Incoming string bytes that are not valid UTF-8 shall be replaced by U+FFFD. | Unit Test |
+| REQ-FprimeRust-039 | A deployment with no `@ fprime-rust` component shall build without invoking cargo. | Unit Test |
+| REQ-FprimeRust-040 | The autocoder shall run on hosts with `fprime-fpp-python` wheels: linux-x86_64, macOS-arm64, win-x64. | Inspection |
 
-Supported type mapping (REQ-FprimeRust-016):
+Type-mapping table (REQ-FprimeRust-016):
 
-| FPP | Rust | FFI |
-|---|---|---|
-| U8..U64, I8..I64 | u8..u64, i8..i64 | same width |
-| F32, F64 | f32, f64 | same |
-| bool | bool | u8 |
-| enum E | generated `#[repr(<FPP repr>)] enum E` | repr integer |
-| string size N | `&str` in, `String` out | `*const c_char` + length |
+| FPP | Rust |
+|---|---|
+| U8..U64, I8..I64 | u8..u64, i8..i64 |
+| F32, F64 | f32, f64 |
+| bool | bool |
+| enum E | generated `#[repr(<FPP repr>)] enum E` |
+| string (any size) | `&str` in; `&str` out (copied by the shim, REQ-037) |
+
+Rejected-element table (REQ-FprimeRust-017; each fails generation naming the element):
+
+| Element | Reason |
+|---|---|
+| serial port | handler takes a serialization buffer |
+| state machine instance | actions and guards take a state-machine id and signal |
+| data-product container or product port | handler takes `Fw::DpContainer` |
+| struct, array or `Fw.Buffer` argument or return type | not carried over the C ABI in this release (campaign scope) |
+
+Carrier capacity (REQ-FprimeRust-037): the declared `string size`, else `FW_FIXED_LENGTH_STRING_SIZE`
+(port, command, parameter strings) or `FW_INTERNAL_INTERFACE_STRING_MAX_SIZE` (internal ports); event and
+telemetry strings are further bounded by `FW_LOG_STRING_MAX_SIZE` / `FW_TLM_STRING_MAX_SIZE`.
 
 ## Design
 
@@ -70,50 +92,69 @@ flowchart LR
   AR --> EXE
 ```
 
-Generated-name table (component `Ns.Comp`, element `X`):
+Generated-name table (component `Ns.Comp`, element `X`; FFI symbols are `fprime_rust_Ns_Comp_<suffix>`):
 
-| Element | C++ shim | FFI symbol | Rust |
+| Element | C++ shim | FFI suffix | Rust |
 |---|---|---|---|
-| input port X | `X_handler(portNum, args)` | `fprime_rust_Ns_Comp_X_handler` | `fn X_handler(&mut self, ctx, port_num, args)` |
-| output port X | `X_out(portNum, args)` | `fprime_rust_Ns_Comp_X_out` | `ctx.X_out(port_num, args)` |
-| command X | `X_cmdHandler(opCode, cmdSeq, args)` | `fprime_rust_Ns_Comp_X_cmd_handler` | `fn X_cmd_handler(&mut self, ctx, args) -> CmdResponse` |
-| event X severity S | `log_S_X(args)` | `fprime_rust_Ns_Comp_log_S_X` | `ctx.log_S_X(args)` |
-| telemetry X | `tlmWrite_X(v)` | `fprime_rust_Ns_Comp_tlmWrite_X` | `ctx.tlmWrite_X(v)` |
-| parameter X | `paramGet_X(valid)` | `fprime_rust_Ns_Comp_paramGet_X` | `ctx.paramGet_X() -> (T, ParamValid)` |
-| parameterUpdated | `parameterUpdated(id)` | `fprime_rust_Ns_Comp_parameter_updated` | `fn parameter_updated(&mut self, ctx, id)` (default no-op) |
-| lifecycle | ctor / `init` / dtor | `..._new`, `..._init`, `..._drop` | `Implementation::new()`, `fn init(&mut self, ctx)`, `Drop` |
+| input port X (sync, guarded, async) | `X_handler(portNum, args)` | `X_handler` | `fn X_handler(&mut self, ctx: &mut Context<'_>, port_num, args) [-> R]` |
+| output port X | `X_out(portNum, args)` | `X_out` | `ctx.X_out(port_num, args) [-> R]` |
+| internal port X | `X_internalInterfaceHandler(args)` / `X_internalInterfaceInvoke(args)` | `X_internal_handler` / `X_internal_invoke` | `fn X_internal_handler(&mut self, ctx, args)` / `ctx.X_internal_invoke(args)` |
+| `hook` member X | `X_overflowHook(portNum, args)` / `X_cmdOverflowHook(opCode, cmdSeq)` | `X_overflow_hook` | `fn X_overflow_hook(&mut self, ctx, …)` (template stub; command stub responds `BUSY`) |
+| command X (async, sync, guarded) | `X_cmdHandler(opCode, cmdSeq, args)` | `X_cmd_handler` | `fn X_cmd_handler(&mut self, ctx, args) -> CmdResponse` |
+| event X severity S | `log_S_X(args)` | `log_S_X` | `ctx.log_S_X(args)` |
+| telemetry X | `tlmWrite_X(v)` | `tlmWrite_X` | `ctx.tlmWrite_X(v)` |
+| parameter X | `paramGet_X(valid)` | `paramGet_X` | `ctx.paramGet_X() -> (T, ParamValid)` |
+| parameterUpdated | `parameterUpdated(id)` | `parameter_updated` | `fn parameter_updated(&mut self, ctx, id: FwPrmIdType)` (default no-op) |
+| queued dispatch (queued components only) | `doDispatch()` | `do_dispatch` | `ctx.do_dispatch() -> MsgDispatchStatus`; `ctx.dispatch_available_messages()` loops until `Empty`/`Exit` |
+| lifecycle | ctor / `init` / dtor | `new`, `init`, `drop` | `Implementation::new()`, `fn init(&mut self, ctx: &InitContext)`, `Drop` |
+
+FFI carriers: integers and floats at their width; `bool` as `u8` (shim writes 0/1, Rust reads `!= 0`); enums as
+their repr integer; strings as `(*const u8, len)` borrowed for the call (in: `from_utf8_lossy`, REQ-038; out:
+copied into the C++ `Fw::StringBase` carrier within the call, truncated to capacity, REQ-037); port return
+values through an out-pointer. `MsgDispatchStatus` mirrors `Fw::QueuedComponentBase::MsgDispatchStatus`.
 
 Artifacts per component: `Comp.hpp`, `Comp.cpp` (shim, `final`, derives `CompComponentBase`), `comp_base.rs`
-(trait `Component`, struct `Context`, `#[no_mangle] extern "C"` entry points boxing `Implementation`),
-`Comp.template.rs`. Per deployment: `fprime_rust/Cargo.toml` (workspace), `fprime_rust/<ns>_<comp>/`
-(rlib: `comp_base.rs` + `#[path]` include of the user's `Comp.rs`), `fprime_rust/fprime_rust_<Deployment>/`
-(staticlib; `lib.rs` is `pub use` of every member and of the runtime), `libfprime_rust_<Deployment>.a`.
+(trait `Component`, `Context<'call>`, `InitContext`, `#[no_mangle] extern "C"` entry points boxing
+`Implementation`), `Comp.template.rs`. Per executable: `fprime_rust/Cargo.toml` (workspace),
+`fprime_rust/<ns>_<comp>/` (rlib: `comp_base.rs` + `#[path]` include of the user's `Comp.rs`),
+`fprime_rust/fprime_rust_<Target>/` (staticlib; `lib.rs` is `pub use` of every member and of the runtime),
+`libfprime_rust_<Target>.a`.
 
-Linkage (one runtime per deployment): the module-level target only generates and records the component
-on the module target (`FPRIME_RUST_COMPONENTS` property). The deployment-level target walks the
-deployment's full dependency list, collects every recorded component, runs `fprime-rust-ac crate` once
-to emit the workspace, builds it with `cargo build --release --target-dir <bin>/fprime_rust/target`
-(profile `panic = "abort"`, `lto = true`), and links the single archive `PRIVATE` into the executable.
-The shim's `extern "C"` references resolve at that final link. Rust std and the runtime therefore exist
-once per executable; two deployments in one build each get their own archive (no shared global state,
-unlike one embedded interpreter). Rejected: one staticlib per component (the MVP: every archive carries
-its own std, giving duplicate symbols and N-fold footprint); a shared dynamic library or
-`-C prefer-dynamic` (loader at run time, not flight-like, platform-specific); linking rlibs from C++
-(an rlib is not a C-ABI artifact); merging per-component archives with `ar`/`objcopy --localize`
+Linkage (one runtime per executable): `autocoder/fprime_rust.cmake` runs per module, returns `Comp.cpp` as
+build sources and `Comp.hpp`/`*.rs` as other outputs, removes `.rs` files from the compiled source list, and
+records the component and its `.rs` on the module target (`FPRIME_RUST_COMPONENTS`, `FPRIME_RUST_SOURCES`).
+`target/fprime_rust.cmake` runs per deployment and per unit-test executable: it walks the executable's full
+dependency list, collects every recorded component, runs `fprime-rust-ac crate` once to emit the workspace,
+builds it with `cargo build --profile <FPRIME_RUST_PROFILE> --target <FPRIME_RUST_TARGET> --target-dir
+<bin>/fprime_rust/target` (every profile: `panic = "abort"`, `lto = true`, `overflow-checks = false`; lints
+`unsafe_op_in_unsafe_fn`, `clippy::unwrap_used`, `clippy::expect_used`, `clippy::indexing_slicing`,
+`clippy::arithmetic_side_effects` = deny), and links the single archive plus the `native-static-libs` cargo
+reports `PRIVATE` into the executable. The shim's `extern "C"` references resolve at that final link, so
+Rust std and the runtime exist once per executable; a component unit-test executable gets its own
+`libfprime_rust_<Comp>_ut.a` the same way. There is no topology annotation (fprime-python marks the
+deployment topology): the executable is the deployment, and an executable with no recorded component invokes
+no cargo and links no archive (REQ-039). Rejected: one staticlib per component (the MVP: every archive
+carries its own std, giving duplicate symbols and N-fold footprint); a shared dynamic library or
+`-C prefer-dynamic` (loader at run time, not flight-like, platform-specific); linking rlibs from C++ (an
+rlib is not a C-ABI artifact); merging per-component archives with `ar`/`objcopy --localize`
 (toolchain-specific and fragile).
 
 Model loading: `fprime-rust-ac bindings <bindir> [--dry-run] --output-directory <bindir> --prefixes
-<FPRIME_BUILD_LOCATIONS> --translation-units <fpp...>` reads `<bindir>/fpp-cache/stdout.txt` (one
-closure path per line, written by F Prime's `fpp_depend` sub-build), deduplicates sources against
-imports, and calls `fpp.analyze(sources, imports=...)` from `fprime-fpp-python==4.0.1`; diagnostics
-fail generation. Types and names come from `fprime-cpp-codegen==0.2.0`. No JSON model is generated or
-read. Platform constraint: `fprime-fpp-python` wheels exist only for linux-x86_64 (cp310-abi3
-manylinux2014), macOS-arm64 and win-x64, so the build host must be one of these.
+<FPRIME_BUILD_LOCATIONS> --translation-units <fpp...>` reads `<bindir>/fpp-cache/stdout.txt` (one closure
+path per line, written by F Prime's `fpp_depend` sub-build; missing, empty or unreadable entries fail naming
+the path, REQ-034), deduplicates sources against imports, and calls `fpp.analyze(sources, imports=...)` from
+`fprime-fpp-python==4.0.1`; diagnostics fail generation. Types and names come from
+`fprime-cpp-codegen==0.2.0`. No JSON model is generated or read; `FPRIME_ENABLE_JSON_MODEL_GENERATION` must
+not be set. Platform constraint: `fprime-fpp-python` wheels exist only for linux-x86_64 (cp310-abi3
+manylinux2014), macOS-arm64 and win-x64 (REQ-040); the Rust archive is built for `FPRIME_RUST_TARGET`
+(default: host triple) and only the host triple is exercised by this campaign. Rust components allocate
+through std; they are not for allocation-free deployments. Deliberate deviation from fprime-python: struct
+and array types are rejected in this release (follow-on: serializers from `fprime-cpp-codegen`).
 
 ### Configure
 
 ```cmake
-# deployment CMakeLists.txt
+# deployment CMakeLists.txt — no FPRIME_ENABLE_JSON_MODEL_GENERATION: the model is read in-process
 include("${CMAKE_CURRENT_LIST_DIR}/lib/fprime/cmake/FPrime.cmake")
 include(FprimeRust)                 # registers target/fprime_rust; no-op in sub-builds
 fprime_setup_included_code()
@@ -127,20 +168,32 @@ library_locations: ./lib/fprime-rust
 register_fprime_module(AUTOCODER_INPUTS "${CMAKE_CURRENT_LIST_DIR}/Comp.fpp"
                        SOURCES "${CMAKE_CURRENT_LIST_DIR}/Comp.rs")
 ```
-Constants: `FPRIME_RUST_CARGO` (cargo path, default from PATH), `FPRIME_RUST_PROFILE` (default `release`).
-Python package `fprime-rust`: dependencies `fprime-fpp-python==4.0.1`, `fprime-cpp-codegen==0.2.0`; script
+Constants: `FPRIME_RUST_CARGO` (cargo path, default from PATH; configure fails naming it when absent,
+REQ-035), `FPRIME_RUST_PROFILE` (default `release`), `FPRIME_RUST_TARGET` (default host triple). Python
+package `fprime-rust`: dependencies `fprime-fpp-python==4.0.1`, `fprime-cpp-codegen==0.2.0`; script
 `fprime-rust-ac`; `cookiecutters/component` (`component_name`, `component_namespace`, `component_kind`).
 
 ### Behavior
 
-The shim is the F Prime component: the autocoded base owns the queue, thread, mutexes and dispatch, so
-component kind is honored unchanged. Each handler the base calls is forwarded over the FFI with the
-opaque `Implementation` pointer and a stack `Context` (`Send`, `!Sync`, valid for that call only).
-Handlers of sync and guarded ports on passive and queued components take a per-instance `Os::Mutex`
-in the shim before entering Rust, so Rust state is never entered concurrently. Command handlers return
-`CmdResponse`, which the shim forwards to `cmdResponse_out`. A panic aborts the process (same as
-`FW_ASSERT`). The Rust implementation is constructed by the shim constructor and dropped by its
-destructor.
+The shim is the F Prime component: the autocoded base owns the queue, thread, mutexes and dispatch, so the
+component kind is honored unchanged. Each handler the base calls is forwarded over the FFI with the opaque
+`Implementation` pointer and a `Context<'call>` that borrows the shim's stack frame (neither `Send` nor
+`Sync`; storing it in `Implementation` is a compile-time error). Memory crosses the FFI only as borrowed
+pointers valid for the call; no allocation changes owner. Instance mutex rule, every component kind: the
+shim takes the instance's non-recursive `Os::Mutex` in every FFI entry that receives `&mut Implementation`
+— port handlers of all kinds, internal-port and command handlers, overflow hooks, `parameter_updated`,
+`init`; handlers dispatched by `ctx.do_dispatch()` run on the dispatching thread while that thread already
+holds the mutex and do not re-take it; a synchronous call path that re-enters the same instance is a design
+error documented in the template. On a Rust component `sync` and `guarded` inputs are therefore equivalent
+and a Rust component is not suitable for lock-free cyclic work shared by several callers. Overflow hooks run
+on the caller's thread under the same mutex. Alias safety of `do_dispatch`: `Context` borrows
+`Implementation` mutably for the duration of the call, so the dispatched handler is the only live `&mut`.
+`init` receives an `InitContext` with no port, event, telemetry or parameter access; parameters are
+available from the first handler call (after `loadParameters`). Command handlers return `CmdResponse`,
+which the shim forwards to `cmdResponse_out`. The runtime installs a panic hook once per process that
+forwards message and location to the F Prime assertion hook before `abort` (REQ-024); the alloc-error
+handler aborts the same way. The Rust implementation is constructed by the shim constructor and dropped by
+its destructor.
 
 ```mermaid
 sequenceDiagram
@@ -148,21 +201,15 @@ sequenceDiagram
   participant S as Comp shim (C++)
   participant R as Implementation (Rust)
   B->>S: BUMP_cmdHandler(opCode, seq, amount)
+  S->>S: lock instance mutex
   S->>R: fprime_rust_Ns_Comp_BUMP_cmd_handler(impl, ctx, amount)
   R->>S: fprime_rust_Ns_Comp_paramGet_THRESHOLD(ctx)
   R->>S: fprime_rust_Ns_Comp_tlmWrite_Counter(ctx, v)
   R->>S: fprime_rust_Ns_Comp_log_ACTIVITY_LO_Bumped(ctx, v)
   R-->>S: CmdResponse::Ok
+  S->>S: unlock
   S->>B: cmdResponse_out(opCode, seq, OK)
 ```
-
-Out-of-scope failure modes:
-
-| Failure | Handling |
-|---|---|
-| struct, array or `Fw.Buffer` port/command argument | generation error naming the element |
-| data products, state machines in a Rust component | generation error naming the element |
-| build host not in the wheel platform set | `pip install` fails before CMake configure |
 
 ## Tests
 
@@ -171,37 +218,45 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 
 | Test | Purpose | Requirements |
 |---|---|---|
-| L0-1 | Confirms the running executable reports the project, framework and library versions recorded in the delivery manifest. | — |
+| L0-1 | Confirms the running executable reports non-empty project, framework and library version strings for the delivery manifest check. | — |
 | L0-2 | Proves the marker command round-trips through the command path so every later window can be bracketed. | — |
-| L2-1 | Resets and bumps the Rust active component to prove commands dispatch into Rust and events and telemetry come back out. | REQ-FprimeRust-008, REQ-FprimeRust-012, REQ-FprimeRust-013, REQ-FprimeRust-014, REQ-FprimeRust-029 |
-| L2-2 | Sets THRESHOLD to 5 and bumps past it to prove the Rust handler reads the parameter and saturates on it. | REQ-FprimeRust-015, REQ-FprimeRust-029 |
-| L2-3 | Bumps the Rust counter and follows the count through the C++ relay into the Rust monitor to prove typed ports in both directions. | REQ-FprimeRust-009, REQ-FprimeRust-010, REQ-FprimeRust-011 |
-| L2-4 | Lets the 1 Hz rate group tick the active Rust component and run the queued Rust component to prove C++ scheduler ports into Rust handlers. | REQ-FprimeRust-008, REQ-FprimeRust-009, REQ-FprimeRust-011, REQ-FprimeRust-014 |
-| L2-5 | Sets the monitor limit then bumps past it to prove a queued Rust component handles commands and raises a warning event from a relayed count. | REQ-FprimeRust-008, REQ-FprimeRust-012, REQ-FprimeRust-013 |
-| L4-1 | Runs the deployment for 60 s to prove the Rust components keep servicing rate-group ports with no command errors or counter drift. | REQ-FprimeRust-014, REQ-FprimeRust-029 |
-| L5-1 | Drives the counter into THRESHOLD saturation to prove the Rust warning event and the clamp. | REQ-FprimeRust-013, REQ-FprimeRust-015 |
-| L6-1 | Sends an invalid limit to prove the Rust handler rejects it with a validation error and changes nothing else. | REQ-FprimeRust-012, REQ-FprimeRust-013 |
-| L7-1 | Resets the counter and reads the installed executable back out of band to leave the deployment in an independently verifiable state. | REQ-FprimeRust-010, REQ-FprimeRust-011, REQ-FprimeRust-029 |
+| L2-1 | Resets and bumps the Rust active component to prove async commands dispatch into Rust and events and telemetry come back out. | REQ-FprimeRust-008, REQ-FprimeRust-012, REQ-FprimeRust-013, REQ-FprimeRust-014, REQ-RustCounter-001, REQ-RustCounter-002, REQ-RustCounter-004 |
+| L2-2 | Sets THRESHOLD to 5 and bumps past it to prove the Rust handler reads the parameter and saturates on it. | REQ-FprimeRust-015, REQ-RustCounter-003, REQ-RustCounter-006 |
+| L2-3 | Bumps the Rust counter and follows the count through the C++ relay into the Rust monitor to prove typed ports in both directions. | REQ-FprimeRust-009, REQ-FprimeRust-010, REQ-FprimeRust-011, REQ-RustCounter-002, REQ-RustCounter-004, REQ-RustMonitor-003, REQ-Relay-001, REQ-Relay-002 |
+| L2-4 | Lets the 1 Hz rate group tick the active Rust component and run the queued Rust component to prove C++ scheduler ports into Rust handlers. | REQ-FprimeRust-008, REQ-FprimeRust-009, REQ-FprimeRust-011, REQ-FprimeRust-014, REQ-RustCounter-005, REQ-RustMonitor-005 |
+| L2-5 | Sets the monitor limit then bumps past it to prove a queued Rust component handles commands and raises a warning event from a relayed count. | REQ-FprimeRust-008, REQ-FprimeRust-012, REQ-FprimeRust-013, REQ-RustMonitor-001, REQ-RustMonitor-004, REQ-RustMonitor-006, REQ-RustMonitor-003 |
+| L4-1 | Runs the deployment for 60 s to prove the Rust components keep servicing rate-group ports with no command errors or counter drift. | REQ-FprimeRust-014, REQ-RustCounter-005, REQ-RustMonitor-005 |
+| L5-1 | Drives the counter into THRESHOLD saturation to prove the Rust warning event and the clamp. | REQ-FprimeRust-013, REQ-FprimeRust-015, REQ-RustCounter-003, REQ-RustCounter-006 |
+| L6-1 | Sends an invalid limit to prove the Rust handler rejects it with a validation error and changes nothing else. | REQ-FprimeRust-012, REQ-FprimeRust-013, REQ-RustMonitor-002, REQ-RustMonitor-006 |
+| L7-1 | Saves THRESHOLD 42 into the parameter file, downlinks the file and resets the counter to leave the deployment in an independently verifiable state. | REQ-FprimeRust-010, REQ-FprimeRust-011, REQ-FprimeRust-015, REQ-RustCounter-001, REQ-RustCounter-004, REQ-RustCounter-007, REQ-Relay-001, REQ-Relay-002, REQ-RustMonitor-003 |
 <!-- fth:tests:end -->
 
 ## Unit-test list
 
 | Test | Description | Requirements |
 |---|---|---|
-| UT-AC-1 | `bindings` on an annotated component emits shim, base module and template; unannotated component emits nothing | REQ-FprimeRust-001, REQ-FprimeRust-005, REQ-FprimeRust-006, REQ-FprimeRust-007 |
-| UT-AC-2 | model loads from a fixture `fpp-cache/stdout.txt`; missing cache file is an error | REQ-FprimeRust-002, REQ-FprimeRust-003 |
-| UT-AC-3 | model with an FPP error fails with the diagnostics text | REQ-FprimeRust-004 |
-| UT-AC-4 | generated names for port, command, event, telemetry, parameter match the name table | REQ-FprimeRust-026 |
-| UT-AC-5 | each supported type maps per the type table; struct argument fails naming the element | REQ-FprimeRust-016, REQ-FprimeRust-017 |
-| UT-AC-6 | `crate` emits one workspace with one member per component and one staticlib root | REQ-FprimeRust-019 |
-| UT-BUILD-1 | CMake build of a two-component deployment links exactly one `libfprime_rust_<Deployment>.a`; `nm` shows one copy of the Rust runtime symbols | REQ-FprimeRust-018 |
-| UT-AC-7 | two runs on an unchanged model produce byte-identical output | REQ-FprimeRust-028 |
-| UT-AC-8 | `--dry-run` lists exactly the files later written | REQ-FprimeRust-022 |
-| UT-AC-9 | cookiecutter renders a buildable component directory | REQ-FprimeRust-027 |
-| UT-RT-1 | `CmdResponse`/`ParamValid` round-trip their F Prime integer codes | REQ-FprimeRust-012, REQ-FprimeRust-015 |
-| UT-RT-2 | `Context` is `Send` and not `Sync` (compile-time assertion) | REQ-FprimeRust-023 |
-| UT-SHIM-1 | shim test with GTest tester base: command dispatch reaches Rust and the response is returned | REQ-FprimeRust-012 |
-| UT-SHIM-2 | typed input port handler reaches Rust; Rust output port invokes the C++ port | REQ-FprimeRust-009, REQ-FprimeRust-010 |
-| UT-SHIM-3 | sync handlers from two threads are serialized by the instance mutex | REQ-FprimeRust-023 |
-| UT-SHIM-4 | constructor calls `new` once; destructor drops once | REQ-FprimeRust-025 |
-| UT-SHIM-5 | a panicking handler aborts the test process (death test) | REQ-FprimeRust-024 |
+| UT-AC-1 | `bindings` on an annotated component emits `Comp.hpp`, `Comp.cpp`, `comp_base.rs`, `Comp.template.rs`; an unannotated component and an annotated port/module emit nothing | REQ-FprimeRust-001, REQ-FprimeRust-005, REQ-FprimeRust-006, REQ-FprimeRust-007 |
+| UT-AC-2 | model loads from a fixture `fpp-cache/stdout.txt` with no JSON file read or written; missing file, empty file and unreadable entry each raise `ModelError` naming the path | REQ-FprimeRust-002, REQ-FprimeRust-003, REQ-FprimeRust-034 |
+| UT-AC-3 | model with an undefined symbol fails with the `fpp` diagnostic text (`symbol X is not defined`) | REQ-FprimeRust-004 |
+| UT-AC-4 | generated names for every row of the name table equal the table (fixture component with each element kind) | REQ-FprimeRust-026 |
+| UT-AC-5 | each type-table row maps as stated; serial port, state machine, data-product container, struct argument each fail with `unsupported element <qualified name>` | REQ-FprimeRust-016, REQ-FprimeRust-017 |
+| UT-AC-6 | `crate` emits one workspace with one rlib member per component and one staticlib root whose `lib.rs` re-exports every member | REQ-FprimeRust-018 |
+| UT-AC-7 | two runs on an unchanged model produce byte-identical output (sha256 equal) | REQ-FprimeRust-028 |
+| UT-AC-8 | `--dry-run` lists exactly the files later written, and the custom command's DEPENDS equals the closure list | REQ-FprimeRust-022 |
+| UT-AC-9 | cookiecutter renders `.fpp`, `.rs`, `CMakeLists.txt`, `docs/sdd.md` for each `component_kind` | REQ-FprimeRust-027 |
+| UT-RT-1 | `CmdResponse`/`ParamValid`/`MsgDispatchStatus` round-trip their F Prime integer codes | REQ-FprimeRust-012, REQ-FprimeRust-015 |
+| UT-RT-2 | `Context` is neither `Send` nor `Sync` (`static_assertions::assert_not_impl_any!`) | REQ-FprimeRust-023 |
+| UT-RT-3 | a panic in a handler reaches the registered F Prime assert hook with the Rust `file:line`, then the process aborts (death test) | REQ-FprimeRust-024 |
+| UT-SHIM-1 | GTest tester base over the shim: one async, one sync and one guarded command each reach Rust and return `OK`/`VALIDATION_ERROR` as the fixture dictates | REQ-FprimeRust-012 |
+| UT-SHIM-2 | one sync, one guarded and one async typed input port reach Rust with arguments; a port with a return type returns the Rust value; a Rust output-port call invokes the C++ port with the same arguments | REQ-FprimeRust-009, REQ-FprimeRust-010, REQ-FprimeRust-033 |
+| UT-SHIM-3 | active fixture: a guarded port called from a second thread while an async handler sleeps is serialized (observed order, no overlap); passive fixture: two sync callers serialized | REQ-FprimeRust-023 |
+| UT-SHIM-4 | constructor calls `new` once; `init` once with no port access; destructor drops once; `parameterUpdated(id)` reaches Rust once per `PRM_SET` | REQ-FprimeRust-025, REQ-FprimeRust-030 |
+| UT-SHIM-5 | one fixture per kind (active, queued, passive) dispatches a port and a command to Rust | REQ-FprimeRust-008 |
+| UT-SHIM-6 | queued fixture: two messages queued before `run`; `run_handler` calls `ctx.dispatch_available_messages()` and both handlers run exactly once on the caller's thread before `run` returns | REQ-FprimeRust-008 |
+| UT-SHIM-7 | one event per severity (ACTIVITY_LO/HI, WARNING_LO/HI, COMMAND, DIAGNOSTIC) is logged with arguments; FATAL under the death-test fixture | REQ-FprimeRust-013 |
+| UT-SHIM-8 | telemetry of each type-table row is written with the value; `paramGet` returns `(value, VALID)`, `(default, DEFAULT)` and `(value, INVALID)` per fixture | REQ-FprimeRust-014, REQ-FprimeRust-015 |
+| UT-SHIM-9 | internal port invoked from Rust reaches the Rust internal handler through the queue; an async port and an async command with `hook` call the Rust overflow hook when the queue is full (command hook responds `BUSY`) | REQ-FprimeRust-031, REQ-FprimeRust-032 |
+| UT-SHIM-10 | a 48-byte Rust string into a `string size 40` event is stored as its first 40 bytes; `"ab\0cd"` is stored as `"ab"`; incoming bytes `0xFF 0x41` arrive as `"\u{FFFD}A"` | REQ-FprimeRust-037, REQ-FprimeRust-038 |
+| UT-BUILD-1 | CMake build of a two-component fixture deployment registered per §Configure: exactly one `libfprime_rust_<Deployment>.a` on the link line; `nm` shows one definition of `rust_begin_unwind`; no duplicate-symbol diagnostics | REQ-FprimeRust-018, REQ-FprimeRust-020, REQ-FprimeRust-021 |
+| UT-BUILD-2 | fixture deployment with no annotated component builds; cargo is not invoked (no `fprime_rust/` directory); with `FPRIME_RUST_CARGO` pointing at a missing file configure fails naming it; a user `.rs` with a type error fails the build with the rustc diagnostic | REQ-FprimeRust-039, REQ-FprimeRust-035, REQ-FprimeRust-036 |
+| UT-INSP-1 | inspection: `pip download fprime-fpp-python==4.0.1 --only-binary :all:` succeeds for the three stated platform tags and no other | REQ-FprimeRust-040 |
