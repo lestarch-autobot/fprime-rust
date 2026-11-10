@@ -1,0 +1,51 @@
+"""CLI paths of fprime-rust-ac: error reporting, `components` listing, enum name collisions"""
+from pathlib import Path
+
+import pytest
+
+from conftest import FIXTURES
+from fprime_rust.autocode.__main__ import main
+from test_autocode import module_with
+
+ENUM_CLASH = """
+module Fx {
+  enum Mode : U8 { A, B }
+  module Inner { enum Mode : U8 { C, D } }
+  @ fprime-rust
+  passive component Clash {
+    sync input port p: Plainish
+  }
+  port Plainish(a: Mode, b: Inner.Mode)
+}
+"""
+
+
+def cli(tmp_path: Path, unit: Path, command: str = "bindings"):
+    return [command, str(tmp_path), "--output-directory", str(tmp_path / "out"), "--prefixes", str(FIXTURES), str(tmp_path),
+            "--translation-units", str(unit)]
+
+
+def test_unsupported_element_exits_one_with_error_line(tmp_path: Path, capsys):
+    unit = module_with(tmp_path, "module Fx {\n  @ fprime-rust\n  passive component Bad { sync input port s: serial }\n}\n")
+    assert main(cli(tmp_path, unit)) == 1
+    assert capsys.readouterr().err.startswith("[ERROR] fprime-rust-ac: unsupported element Fx.Bad.s")
+
+
+def test_missing_cache_exits_one_with_error_line(tmp_path: Path, capsys):
+    unit = tmp_path / "Mod.fpp"
+    unit.write_text("module Fx {\n  @ fprime-rust\n  passive component C { }\n}\n", encoding="utf-8")
+    assert main(cli(tmp_path, unit)) == 1
+    assert "[ERROR] fprime-rust-ac:" in capsys.readouterr().err
+
+
+def test_components_lists_rust_components_as_crate_members(tmp_path: Path, capsys):
+    unit = module_with(tmp_path, "module Fx {\n  @ fprime-rust\n  passive component Two { }\n  passive component Cpp { }\n}\n")
+    assert main(cli(tmp_path, unit, "components")) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1 and lines[0].startswith("Fx.Two=") and lines[0].endswith("Two.rs")
+
+
+def test_two_enums_with_one_simple_name_are_rejected(tmp_path: Path, capsys):
+    unit = module_with(tmp_path, ENUM_CLASH)
+    assert main(cli(tmp_path, unit)) == 1
+    assert "Mode" in capsys.readouterr().err
