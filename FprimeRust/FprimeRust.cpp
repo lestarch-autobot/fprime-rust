@@ -34,12 +34,15 @@ FwSizeType copyBytes(CHAR* destination, FwSizeType destinationSize, const CHAR* 
 }
 
 void assignString(Fw::StringBase& destination, const CHAR* bytes, FwSizeType length) {
-    // Copy through a bounded, NUL-terminated local so that the carrier's own assignment stays in charge
-    CHAR local[FW_FIXED_LENGTH_STRING_SIZE];
-    const FwSizeType capacity = destination.getCapacity();
-    const FwSizeType bound = (capacity < sizeof(local)) ? capacity : sizeof(local);
-    (void)copyBytes(local, bound, bytes, length);
-    destination = local;
+    // `%.*s` stops at `length` or an interior NUL, and the carrier's own format bounds the copy at its capacity
+    const FwSizeType bound = (length > static_cast<FwSizeType>(std::numeric_limits<int>::max()))
+                                 ? static_cast<FwSizeType>(std::numeric_limits<int>::max())
+                                 : length;
+    if (bytes == nullptr || bound == 0) {
+        destination = "";
+        return;
+    }
+    (void)destination.format("%.*s", static_cast<int>(bound), bytes);
 }
 
 }  // namespace FprimeRust

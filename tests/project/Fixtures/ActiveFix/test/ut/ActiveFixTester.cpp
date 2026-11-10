@@ -6,6 +6,10 @@
 
 #include "ActiveFixTester.hpp"
 
+#include "Os/Task.hpp"
+#include "Os/RawTime.hpp"
+#include "Fw/Test/UnitTest.hpp"
+
 namespace Fix {
 
 // ----------------------------------------------------------------------
@@ -25,7 +29,30 @@ ActiveFixTester ::~ActiveFixTester() { this->component.deinit(); }
 // Tests
 // ----------------------------------------------------------------------
 
+void ActiveFixTester::UT_SHIM_3_guardedCallerSerializedAgainstAsyncHandler() {
+    REQUIREMENT("REQ-FprimeRust-023");
+    COMMENT("UT-SHIM-3 (active): a guarded call from this thread blocks while the component thread runs an async handler");
+    this->clearHistory();
+    this->component.start();
+    this->invoke_to_aIn(0, 777);  // handler sleeps 200 ms on the component thread, holding the instance mutex
+    Os::Task::delay(Fw::TimeInterval(0, 50000));
+    Os::RawTime before;
+    before.now();
+    this->invoke_to_gIn(0, 5);
+    Os::RawTime after;
+    after.now();
+    U32 elapsedUs = 0;
+    ASSERT_EQ(after.getDiffUsec(before, elapsedUs), Os::RawTime::OP_OK);
+    this->component.exit();
+    this->component.join();
+    ASSERT_GE(elapsedUs, 100000u);
+    ASSERT_TLM_T_X_SIZE(2);
+    ASSERT_TLM_T_X(0, 777);
+    ASSERT_TLM_T_X(1, 5);
+}
+
 void ActiveFixTester::UT_SHIM_5_activeDispatchesPortAndCommand() {
+    this->clearHistory();
     this->invoke_to_aIn(0, 11);
     ASSERT_TLM_SIZE(0);  // queued until the active component's thread dispatches
     this->component.doDispatch();

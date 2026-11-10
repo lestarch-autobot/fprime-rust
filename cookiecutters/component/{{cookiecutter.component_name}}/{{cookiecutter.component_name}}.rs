@@ -1,6 +1,6 @@
 //! `{{cookiecutter.component_namespace}}.{{cookiecutter.component_name}}`: {{cookiecutter.component_short_description}}
 //!
-//! Each build writes `{{cookiecutter.component_name}}.template.rs` next to this file with a stub for every handler
+//! Each build writes `{{cookiecutter.component_name}}.template.rs` into the module build directory with a stub for every handler
 //! in the model. Copy the stubs of newly modeled handlers from there into this file.
 use crate::{{cookiecutter.component_name|lower}}_base::*;
 {% if cookiecutter.component_kind == "queued" %}

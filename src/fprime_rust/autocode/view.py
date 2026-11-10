@@ -76,6 +76,18 @@ class TypeInfo:
     is_primitive: bool = True
 
     @property
+    def string_capacity(self) -> str:
+        """Buffer size expression: a `string size N` carrier and an `FW_*_STRING_MAX_SIZE`-bounded carrier both hold
+        their size in characters plus the NUL (F Prime `BUFFER_SIZE(size)`)"""
+        return f"{self.string_size} + 1"
+
+    def rust_string_capacity(self, where: str) -> str:
+        """Rust needs a compile-time array length, which the C++ carrier macros cannot provide"""
+        if self.string_size is None or not self.string_size.isdigit():
+            raise UnsupportedElement(where, "unsized string read into Rust needs a declared `string size N`")
+        return self.string_capacity
+
+    @property
     def by_const_ref(self) -> bool:
         return self.kind in ("string", "enum")
 

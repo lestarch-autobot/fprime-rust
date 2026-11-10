@@ -1,161 +1,112 @@
-# fprime-rust: F´ to Rust Bindings
+# fprime-rust: Rust components for F Prime
 
-`fprime-rust` is an autocoder for [F Prime](https://fprime.jpl.nasa.gov/) that
-lets you implement components in **Rust** while reusing the standard FPP model,
-component bases, and topology infrastructure.  It is intentionally modeled
-after the existing
-[`fprime-python`](https://github.com/fprime-community/fprime-python) project so
-that operators familiar with one feel at home in the other.
-
-> **Status:** Experimental.  The MVP supports primitive-typed commands, events,
-> telemetry, and parameters.  Richer FPP types (arrays, structs, enums) can
-> be added without API churn -- see
-> [`docs/sdd.md`](docs/sdd.md) for the extension surface.
-
-## Why?
-
-- Lets project teams put performance- or safety-critical logic in Rust without
-  abandoning the F Prime build/model/topology workflow.
-- Keeps the FPP model authoritative -- you write FPP, you implement in Rust,
-  the autocoder regenerates the binding code on every build.
-- Reuses the C++ component base verbatim, so existing F Prime tooling
-  (Dictionary, GDS, SBOM, install rules) keeps working.
+`fprime-rust` is an [F Prime](https://fprime.jpl.nasa.gov/) autocoder plugin that lets a component be
+implemented in Rust while the FPP model, the C++ component base classes, the topology, the dictionary and the
+GDS stay exactly as they are. It follows the shape of
+[`fprime-python`](https://github.com/fprime-community/fprime-python). The design is
+[`docs/sdd.md`](docs/sdd.md); this README is the operator's view of it.
 
 ## How it works
 
-Component authors mark an FPP component with `@ fprime-rust`:
+1. Annotate a component `@ fprime-rust` in its `.fpp` file. FPP is authoritative: ports, commands, events,
+   telemetry, parameters and their types all come from the model.
+2. `fprime-rust-ac bindings` runs as an F Prime autocoder on each module build directory. It loads the module's
+   complete FPP closure from `fpp-cache/stdout.txt` with `fpp.analyze` (no JSON model is written or read) and,
+   for every annotated component, generates:
+   - `<Comp>.hpp` / `<Comp>.cpp` — the C++ shim deriving from the FPP-generated `<Comp>ComponentBase`; every
+     handler forwards to Rust through `extern "C"` functions, under the instance mutex rule of the SDD
+     (queued components drain their queue in every sync/guarded entry and never re-lock in async entries);
+   - `<comp>_base.rs` — the Rust base module: the `Component` trait with one method per handler, and a
+     `Context` (not `Send`/`Sync`) exposing `log_*`, `tlmWrite_*`, `paramGet_*`, output-port and internal-port
+     calls with the same names as the C++ base class;
+   - `<Comp>.template.rs` — a user template, written into the module build directory. `<Comp>.rs` is seeded
+     from it when absent and is the only file the component author edits.
+3. `fprime-rust-ac crate` runs once per deployment executable and emits one Cargo workspace under
+   `<build>/fprime_rust/<EXECUTABLE>/`: one rlib member per Rust component and a `staticlib` root. `cargo build`
+   produces the single `libfprime_rust_<EXECUTABLE>.a` that is linked into the executable, after the shim
+   objects, together with the C++ runtime (`FprimeRust/`) that bridges Rust panics to `FW_ASSERT`.
 
-```fpp
-module Ref {
-    @ Example component implemented in Rust
-    @ fprime-rust
-    queued component RustExample {
-        # ... commands, events, telemetry, parameters ...
-    }
-}
-```
-
-`fprime-rust-ac` (run automatically by CMake) generates four files for the
-component:
-
-| File                                       | Role                                                |
-|--------------------------------------------|-----------------------------------------------------|
-| `<Component>.hpp`                          | C++ shim header (final subclass of FPP base).       |
-| `<Component>.cpp`                          | C++ shim source -- forwards handlers to Rust.       |
-| `<component>_base.rs`                      | Rust base module -- trait, FFI, dispatch shims.     |
-| `<Component>.template.rs` -> `<Component>.rs` | One-time user template seeded into the source dir. |
-
-You then implement behavior in `<Component>.rs` by `impl`-ing the auto-coded
-trait.  Example:
-
-```rust
-use fprime_rust::CmdResponse;
-use crate::rust_example_base::{Component, Context};
-
-pub struct Implementation { /* state */ }
-
-impl Implementation {
-    pub fn new() -> Self { Self { /* ... */ } }
-}
-
-impl Component for Implementation {
-    fn Reset_cmd_handler(&mut self, ctx: &mut Context) {
-        ctx.tlm_write_Counter(0);
-        ctx.log_ResetIssued();
-        ctx.command_response(CmdResponse::Ok);
-    }
-}
-```
+Supported FPP types across the FFI: integers, floats, `bool`, enums, strings (borrowed into Rust as `&str`,
+bounded by the carrier capacity, truncated at an interior NUL, invalid UTF-8 replaced by U+FFFD) and aliases of
+these. Structs, arrays, `Fw.Buffer`/`Fw.Com` arguments, serial ports, state machines and data products are
+rejected with a clear `unsupported element <qualified name>` error at generation time, as are unsized strings
+read into Rust (parameters and port returns need `string size N`).
 
 ## Repository layout
 
 ```
-fprime-rust/
-├── README.md                      # this file
-├── library.cmake                  # F Prime library entry point
-├── pyproject.toml                 # Python autocoder package metadata
-├── cmake/
-│   ├── autocoder/fprime_rust.cmake   # autocoder hook
-│   └── target/fprime_rust.cmake      # module/deployment target hook
-├── src/fprime_rust/                  # autocoder Python source
-│   └── autocode/
-│       ├── __main__.py               # `fprime-rust-ac` CLI
-│       ├── fpp_parser.py             # FPP -> dataclasses
-│       ├── cpp_generator.py          # C++ shim emitter
-│       ├── rust_generator.py         # Rust trait/FFI emitter
-│       └── cargo_generator.py        # Cargo workspace emitter
-├── runtime/                          # `fprime-rust` runtime crate (Rust)
-│   ├── Cargo.toml
-│   └── src/lib.rs
-└── docs/
-    └── sdd.md                        # software design description (requirements, design, tests)
+cmake/
+  FprimeRust.cmake            # include(FprimeRust): registers the autocoder, the target and the runtime
+  autocoder/fprime_rust.cmake # per-module autocoder: fprime-rust-ac bindings
+  target/fprime_rust.cmake    # per-executable target: fprime-rust-ac crate + cargo build + link
+FprimeRust/                   # C++ runtime: panic/assert bridge, string assignment, runtime marker
+runtime/                      # Rust runtime crate: CmdResponse, ParamValid, MsgDispatchStatus, panic hook
+src/fprime_rust/autocode/     # the generator (model.py, view.py, names.py, cpp_shim.py, rust_base.py, ...)
+cookiecutters/component/      # fprime-util new --component template for a Rust component
+tests/                        # pytest (generator) and tests/project (F Prime fixture project with C++ UTs)
+docs/sdd.md                   # the design
 ```
 
 ## Setup
 
-1. Make `fprime-rust-ac` available on your `PATH`:
+```bash
+python3 -m venv fprime-venv && source fprime-venv/bin/activate
+pip install -r lib/fprime/requirements.txt
+pip install -e lib/fprime-rust            # provides fprime-rust-ac; pins fprime-fpp-python==4.0.1
+curl https://sh.rustup.rs -sSf | sh       # stable toolchain; cargo must be on PATH
+```
 
-   ```bash
-   pip install fprime-rust  # once published; today: pip install -e fprime-rust
-   ```
+In the project `CMakeLists.txt`, after `include("${FPRIME_FRAMEWORK_PATH}/cmake/FPrime.cmake")`:
 
-2. Reference the library from your deployment's `settings.ini`:
+```cmake
+include(FprimeRust)
+```
 
-   ```ini
-   [fprime]
-   library_locations: ./lib/fprime-rust
-   ```
+and list `lib/fprime-rust` under `library_locations` in `settings.ini`. A Rust component module registers its
+sources as usual:
 
-3. Register the target in your project's top-level `CMakeLists.txt`:
+```cmake
+register_fprime_module(
+    AUTOCODER_INPUTS "${CMAKE_CURRENT_LIST_DIR}/RustCounter.fpp"
+    SOURCES          "${CMAKE_CURRENT_LIST_DIR}/RustCounter.rs"
+)
+```
 
-   ```cmake
-   register_fprime_target(target/fprime_rust)
-   ```
+`fprime-util generate && fprime-util build` then builds the Rust code with the deployment. Unit tests of a Rust
+component are ordinary F Prime GTest unit tests over the generated shim (`fprime-util check`).
 
-   (Alternatively, mirror the example in
-   [`Ref/CMakeLists.txt`](../Ref/CMakeLists.txt) which adds the rust example
-   under the standard Ref deployment.)
+## Writing a component
 
-4. Author components: add `@ fprime-rust` to the FPP component block.  After
-   the first build, edit the seeded `<Component>.rs` to fill in behavior.
+```rust
+use crate::rustcounter_base::*;
 
-5. Build with `fprime-util generate && fprime-util build` as usual.  CMake
-   will invoke `fprime-rust-ac` and `cargo build --release`.
+pub struct RustCounter { counter: u32 }
 
-## Sample component
+impl Component for RustCounter {
+    fn new() -> Self { RustCounter { counter: 0 } }
 
-A minimal example lives in the companion
-[`fprime-rust-reference`](https://github.com/JPL-Devin/fprime-rust-reference)
-project, in
-[`FprimeRustReference/Components/RustExample/`](https://github.com/JPL-Devin/fprime-rust-reference/tree/main/FprimeRustReference/Components/RustExample).
-It demonstrates one of each:
+    fn BUMP_cmd_handler(&mut self, ctx: &mut Context<'_>, amount: u32) -> CmdResponse {
+        let (threshold, _valid) = ctx.paramGet_THRESHOLD();
+        self.counter = self.counter.saturating_add(amount).min(threshold);
+        ctx.log_ACTIVITY_LO_Bumped(self.counter);
+        CmdResponse::Ok
+    }
+}
+```
 
-- a command (`Reset`),
-- an event (`ResetIssued`),
-- a telemetry channel (`Counter`),
-- a parameter (`Threshold`).
+`fprime-util new --component` with this repository's cookiecutter (`cookiecutters/component`) creates the
+module, the annotated `.fpp`, the `.rs` and an SDD skeleton. The reference deployment lives in
+[`fprime-rust-reference`](https://github.com/lestarch-autobot/fprime-rust-reference).
 
-## Documentation
+## Testing
 
-- [`docs/sdd.md`](docs/sdd.md) -- software design description: requirements, design, tests.
-- (folded into `docs/sdd.md`) -- block-level overview and
-  data flow.
-
-## Limitations / future work
-
-- **Type support**: currently primitive FPP types only (`U8`-`U64`, `I8`-`I64`,
-  `F32`/`F64`, `bool`).  Strings, arrays, enums, and structs are tracked in
-  `docs/sdd.md`.
-- **Async commands**: command-handler dispatch is synchronous from the Rust
-  side; long-running operations should off-load to dedicated worker tasks.
-- **Unit tests**: the autocoder has Python unit tests
-  (`pytest fprime-rust/tests`) but the Rust integration test harness is not
-  yet wired into FPP-generated testers.
-- **Build verification**: the autocoder is wired into CMake, but a full
-  end-to-end build has not been run on this branch (an FPP/fprime-tools
-  environment was not available in this session).  See the PR description
-  for the artifacts that *were* validated.
+```bash
+pytest                                   # generator tests (pip install -e ".[test]")
+(cd runtime && cargo test)               # runtime conversions and the panic bridge
+(cd tests/project && fprime-util generate --ut && fprime-util check --all)   # C++ fixture unit tests over the shim
+FPRIME_RUST_FIXTURE_BUILD=tests/project/build-fprime-automatic-native-ut pytest tests/test_build.py
+```
 
 ## License
 
-Apache 2.0.  Same as the rest of F Prime.
+Apache 2.0, same as F Prime.

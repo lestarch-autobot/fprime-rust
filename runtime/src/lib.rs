@@ -172,9 +172,9 @@ impl StrOut for String {
 
 extern "C" {
     /// C++ runtime (FprimeRust/FprimeRust.cpp): report a panic to the F Prime assertion hook and abort
-    pub fn fprime_rust_assert(file: *const u8, file_len: u64, line: u32, msg: *const u8, msg_len: u64) -> !;
+    pub fn fprime_rust_assert(file: *const u8, file_len: usize, line: u32, msg: *const u8, msg_len: usize) -> !;
     /// C++ runtime: assign bytes into a `Fw::StringBase` carrier (truncating to capacity and interior NUL)
-    pub fn fprime_rust_string_assign(carrier: *mut c_void, bytes: *const u8, len: u64);
+    pub fn fprime_rust_string_assign(carrier: *mut c_void, bytes: *const u8, len: usize);
     /// C++ runtime marker: one definition per executable (REQ-FprimeRust-020)
     pub fn fprime_rust_runtime_marker() -> u32;
 }
@@ -185,7 +185,7 @@ extern "C" {
 /// `carrier` must be a valid `Fw::StringBase*` for the duration of the call.
 pub unsafe fn assign_string(carrier: *mut c_void, value: &str) {
     // SAFETY: the caller guarantees a valid carrier; `value` is borrowed for the call
-    unsafe { fprime_rust_string_assign(carrier, value.as_ptr(), value.len() as u64) }
+    unsafe { fprime_rust_string_assign(carrier, value.as_ptr(), value.len()) }
 }
 
 static PANIC_HOOK: Once = Once::new();
@@ -210,10 +210,10 @@ pub fn install_panic_hook() {
             unsafe {
                 fprime_rust_assert(
                     file.as_ptr(),
-                    file.len() as u64,
+                    file.len(),
                     line,
                     message.as_ptr(),
-                    message.len() as u64,
+                    message.len(),
                 )
             }
         }));

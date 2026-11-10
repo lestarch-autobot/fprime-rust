@@ -9,6 +9,13 @@ impl Component for ActiveFix {
     }
 
     fn aIn_handler(&mut self, ctx: &mut Context<'_>, _port_num: FwIndexType, x: u32) {
+        if x == 777 {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        ctx.tlmWrite_T_X(x);
+    }
+
+    fn gIn_handler(&mut self, ctx: &mut Context<'_>, _port_num: FwIndexType, x: u32) {
         ctx.tlmWrite_T_X(x);
     }
 

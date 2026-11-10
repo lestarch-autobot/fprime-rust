@@ -1,9 +1,11 @@
 module Fix {
-  @ Active shim fixture: UT-SHIM-5 (active)
+  @ Active shim fixture: UT-SHIM-3 (active), UT-SHIM-5 (active)
   @ fprime-rust
   active component ActiveFix {
-    @ writes T_X(x)
+    @ writes T_X(x); x == 777 sleeps 200 ms first (UT-SHIM-3)
     async input port aIn: Plain
+    @ writes T_X(x) (UT-SHIM-3: serialized against aIn)
+    guarded input port gIn: Plain
     command recv port cmdIn
     command reg port cmdRegOut
     command resp port cmdResponseOut

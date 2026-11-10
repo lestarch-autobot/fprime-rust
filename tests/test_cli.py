@@ -49,3 +49,14 @@ def test_two_enums_with_one_simple_name_are_rejected(tmp_path: Path, capsys):
     unit = module_with(tmp_path, ENUM_CLASH)
     assert main(cli(tmp_path, unit)) == 1
     assert "Mode" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("body", [
+    "param P: string default \"\"\n    param get port prmGetOut\n    param set port prmSetOut\n"
+    "    command recv port cmdIn\n    command reg port cmdRegOut\n    command resp port cmdResponseOut",
+    "output port o: Ret",
+])
+def test_unsized_string_read_into_rust_is_rejected(tmp_path: Path, capsys, body: str):
+    unit = module_with(tmp_path, f"module Fx {{\n  port Ret -> string\n  @ fprime-rust\n  passive component Bad {{\n    {body}\n  }}\n}}\n")
+    assert main(cli(tmp_path, unit)) == 1
+    assert "unsized string" in capsys.readouterr().err

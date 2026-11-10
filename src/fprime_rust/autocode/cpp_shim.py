@@ -25,8 +25,7 @@ def ffi_type(type_: TypeInfo) -> str:
 
 def string_buffer_size(type_: TypeInfo) -> str:
     """Size expression of the local carrier buffer for an outgoing string"""
-    size = type_.string_size
-    return f"{size} + 1" if size is not None and size.isdigit() else str(size)
+    return type_.string_capacity
 
 
 # -- signature pieces ----------------------------------------------------------------------------------------
@@ -226,6 +225,8 @@ def generate_hpp(view: ComponentView, model_name: str) -> str:
               f"    explicit {view.name}(const char* const compName);",
               f"    //! Drop the Rust implementation",
               f"    ~{view.name}();",
+              f"    {view.name}(const {view.name}&) = delete;",
+              f"    {view.name}& operator=(const {view.name}&) = delete;",
               "    //! Initialize the base, then the Rust implementation (`init`)"]
     if view.is_queued_kind:
         lines.append("    void init(FwSizeType queueDepth, FwEnumStoreType instance = 0);")

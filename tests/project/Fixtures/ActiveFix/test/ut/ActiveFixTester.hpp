@@ -45,6 +45,7 @@ public:
   // ----------------------------------------------------------------------
 
   //! To do
+  void UT_SHIM_3_guardedCallerSerializedAgainstAsyncHandler();
   void UT_SHIM_5_activeDispatchesPortAndCommand();
 
 private:

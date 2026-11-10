@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.1.0] - Unreleased
 
+### Added
+
+- Autocoder on `fpp.analyze` over the module closure from `fpp-cache/stdout.txt`; generated C++ shim, Rust base
+  module and user template per the SDD name table; one Cargo workspace and one static archive per deployment
+  executable (`fprime-rust-ac crate`); runtime crate with `CmdResponse`, `ParamValid`, `MsgDispatchStatus` and the
+  panic-to-`FW_ASSERT` bridge; `include(FprimeRust)` CMake integration; component cookiecutter; pytest, cargo and
+  F Prime C++ fixture unit tests.
+
 ### Changed
 
 - Generated `Context` helper methods now mirror the standard F Prime C++
