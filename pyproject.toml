@@ -21,7 +21,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
 ]
-dependencies = []
+dependencies = [
+    "fprime-fpp-python==4.0.1",
+    "fprime-cpp-codegen==0.2.0",
+    "cookiecutter>=2.1",
+]
 
 [project.scripts]
 fprime-rust-ac = "fprime_rust.autocode.__main__:main"
