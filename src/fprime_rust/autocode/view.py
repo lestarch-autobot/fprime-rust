@@ -287,6 +287,14 @@ class ModelView:
     def resolve_type(self, type_name) -> fpp.Type.Variant:
         return self.analysis.type_map[type_name.node_id]
 
+    def enum_rust_name(self, qualified_name: str) -> str:
+        """Type-table row `enum E` -> Rust `E`; two enums sharing a simple name cannot both be generated"""
+        simple = qualified_name.rsplit(".", 1)[-1]
+        for other, info in self._enums.items():
+            if info.rust_name == simple and other != qualified_name:
+                raise UnsupportedElement(qualified_name, f"enum {other} already generates Rust `{simple}`")
+        return simple
+
     def enum_info(self, enum_type: fpp.Type.Enum) -> EnumInfo:
         symbol = enum_type.def_symbol
         if symbol.qualified_name not in self._enums:
@@ -297,7 +305,7 @@ class ModelView:
                 constants.append((constant.name, int(value[1] if isinstance(value, tuple) else value)))
             self._enums[symbol.qualified_name] = EnumInfo(
                 qualified_name=symbol.qualified_name,
-                rust_name=flat_name(symbol.qualified_name),
+                rust_name=self.enum_rust_name(symbol.qualified_name),
                 repr=INTEGER_RUST[enum_type.rep_type.name],
                 cpp_name=cpp_name(symbol.qualified_name),
                 constants=constants,
