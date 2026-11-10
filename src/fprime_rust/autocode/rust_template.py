@@ -29,7 +29,7 @@ def default_value(type_: Optional[TypeInfo]) -> str:
     if type_.kind == "bool":
         return "false"
     if type_.kind == "enum":
-        return f"{type_.rust}::{type_.enum.constants[0][0]}"
+        return f"{type_.rust}::{type_.enum.variant_name(type_.enum.constants[0][0])}"
     return "0" if type_.kind == "int" else "0.0"
 
 

@@ -62,6 +62,13 @@ class EnumInfo:
     constants: List[tuple]  # (name, value)
     runtime: bool = False   # provided by the fprime_rust runtime crate (Fw.ParamValid, Fw.CmdResponse): no enum block
 
+    def variant_name(self, fpp_constant: str) -> str:
+        """Rust variant for an FPP constant: generated enums keep the FPP name, the runtime crate's enums are
+        UpperCamel (`INVALID_OPCODE` -> `InvalidOpcode`, `UNINIT` -> `Uninit`)"""
+        if not self.runtime:
+            return fpp_constant
+        return "".join(part[:1].upper() + part[1:].lower() for part in fpp_constant.split("_") if part)
+
 
 # FPP enums the runtime crate already defines; generating them again would clash with the base module's re-exports
 RUNTIME_ENUMS = {"Fw.ParamValid": "ParamValid", "Fw.CmdResponse": "CmdResponse"}

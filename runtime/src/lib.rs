@@ -48,6 +48,10 @@ pub enum CmdResponse {
     ExecutionError = 4,
     /// Component busy
     Busy = 5,
+    /// Command tracking was cleared before the command completed
+    Cleared = 6,
+    /// Command was dispatched but the response tracking failed, indicating unknown state
+    DispatchedUntracked = 7,
 }
 
 impl CmdResponse {
@@ -56,14 +60,20 @@ impl CmdResponse {
         self as u32
     }
 
-    /// FFI carrier (generated-enum interface)
-    pub const fn repr(self) -> u32 {
-        self as u32
+    /// FPP representation (generated-enum interface): `Fw.CmdResponse` is `enum CmdResponse : U8` in
+    /// Fw/Cmd/Cmd.fpp; the FFI carrier stays `u32` (`code`/`from_code`)
+    pub const fn repr(self) -> u8 {
+        self as u8
     }
 
-    /// Decode the FFI carrier (generated-enum interface)
-    pub const fn from_repr(value: u32) -> Option<Self> {
-        Self::from_code(value)
+    /// Decode the FPP representation (generated-enum interface)
+    pub const fn from_repr(value: u8) -> Option<Self> {
+        Self::from_code(value as u32)
+    }
+
+    /// Runtime variant name of an FPP constant (`INVALID_OPCODE` -> `InvalidOpcode`), for the generator
+    pub fn variant_name(fpp_constant: &str) -> String {
+        camel_case(fpp_constant)
     }
 
     /// Decode an F Prime integer code
@@ -75,6 +85,8 @@ impl CmdResponse {
             3 => Some(CmdResponse::FormatError),
             4 => Some(CmdResponse::ExecutionError),
             5 => Some(CmdResponse::Busy),
+            6 => Some(CmdResponse::Cleared),
+            7 => Some(CmdResponse::DispatchedUntracked),
             _ => None,
         }
     }
@@ -255,4 +267,19 @@ pub fn enum_from_repr<T, R: std::fmt::Debug + Copy>(value: R, decode: fn(R) -> O
 #[no_mangle]
 pub extern "C" fn fprime_rust_runtime_marker() -> u32 {
     0x5255_5354 // "RUST"
+}
+
+/// `UPPER_SNAKE` FPP constant -> `UpperCamel` Rust variant, the naming the runtime enums use
+pub fn camel_case(fpp_constant: &str) -> String {
+    fpp_constant
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+                None => String::new(),
+            }
+        })
+        .collect()
 }

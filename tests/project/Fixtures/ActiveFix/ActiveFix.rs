@@ -18,6 +18,7 @@ impl Component for ActiveFix {
     fn gIn_handler(&mut self, ctx: &mut Context<'_>, _port_num: FwIndexType, x: u32) {
         ctx.tlmWrite_T_X(x);
         ctx.tlmWrite_T_DROPPED(ctx.num_msgs_dropped() as u32);
+        ctx.tlmWrite_T_RESP(CmdResponse::Ok);
     }
 
     fn AC_cmd_handler(&mut self, ctx: &mut Context<'_>, x: u32) -> CmdResponse {

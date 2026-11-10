@@ -80,8 +80,20 @@ def test_multiline_hook_command_generates_the_overflow_hook(tmp_path: Path):
 def test_runtime_enum_types_are_not_regenerated(tmp_path: Path):
     """Fw.ParamValid telemetry uses the runtime crate's ParamValid; no clashing enum block"""
     unit = module_with(tmp_path, "module Fx {\n  @ fprime-rust\n  passive component Pv {\n    telemetry port tlmOut\n    time get port timeCaller\n"
-                       "    telemetry V: Fw.ParamValid\n  }\n}\n")
+                       "    telemetry V: Fw.ParamValid\n    telemetry R: Fw.CmdResponse\n  }\n}\n")
     assert main(cli(tmp_path, unit)) == 0
     base = (tmp_path / "out" / "pv_base.rs").read_text()
     assert "pub enum ParamValid" not in base
+    assert "pub enum CmdResponse" not in base
+    assert "pub fn tlmWrite_R(&mut self, value: CmdResponse)" in base
     assert "pub fn tlmWrite_V(&mut self, value: ParamValid)" in base
+
+
+def test_runtime_enum_defaults_use_runtime_variant_names(tmp_path: Path):
+    """a sync input port returning Fw.ParamValid: the template's default return is the runtime variant (Uninit)"""
+    unit = module_with(tmp_path, "module Fx {\n  port Q -> Fw.ParamValid\n  @ fprime-rust\n  passive component Pq {\n"
+                       "    sync input port q: Q\n  }\n}\n")
+    assert main(cli(tmp_path, unit)) == 0
+    template = (tmp_path / "out" / "Pq.template.rs").read_text()
+    assert "ParamValid::Uninit" in template
+    assert "ParamValid::UNINIT" not in template

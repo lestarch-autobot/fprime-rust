@@ -67,13 +67,15 @@ void ActiveFixTester::UT_SHIM_5_activeDispatchesPortAndCommand() {
 }
 
 void ActiveFixTester::numMsgsDroppedReadable() {
-    REQUIREMENT("REQ-FprimeRust-012");
+    REQUIREMENT("REQ-FprimeRust-006");
     COMMENT("active fixture: a guarded handler publishes getNumMsgsDropped() read through ctx.num_msgs_dropped(); zero before any overflow");
     this->clearHistory();
     this->invoke_to_gIn(0, 9);
     ASSERT_TLM_T_X(0, 9);
     ASSERT_TLM_T_DROPPED_SIZE(1);
     ASSERT_TLM_T_DROPPED(0, 0);
+    ASSERT_TLM_T_RESP_SIZE(1);
+    ASSERT_TLM_T_RESP(0, Fw::CmdResponse::OK);
 }
 
 }  // namespace Fix

@@ -20,12 +20,19 @@ fn cmd_response_round_trips_fprime_codes() {
         (CmdResponse::FormatError, 3),
         (CmdResponse::ExecutionError, 4),
         (CmdResponse::Busy, 5),
+        (CmdResponse::Cleared, 6),
+        (CmdResponse::DispatchedUntracked, 7),
     ];
     for (value, code) in table {
         assert_eq!(value.code(), code);
         assert_eq!(CmdResponse::from_code(code), Some(value));
+        // FPP representation (Fw.CmdResponse : U8) used by the generated enum interface
+        assert_eq!(value.repr() as u32, code);
+        assert_eq!(CmdResponse::from_repr(code as u8), Some(value));
     }
-    assert_eq!(CmdResponse::from_code(6), None);
+    assert_eq!(CmdResponse::from_code(8), None);
+    assert_eq!(CmdResponse::from_repr(8), None);
+    assert_eq!(fprime_rust::camel_case("DISPATCHED_UNTRACKED"), "DispatchedUntracked");
 }
 
 #[test]

@@ -20,6 +20,8 @@ module Fix {
     telemetry T_X: U32
     @ getNumMsgsDropped as seen from Rust (covers the num_msgs_dropped helper)
     telemetry T_DROPPED: U32
+    @ Fw.CmdResponse telemetry: the runtime crate's enum must serve as a generated-enum type
+    telemetry T_RESP: Fw.CmdResponse
     event E_X(x: U32) severity activity low format "{}"
   }
 }
