@@ -49,10 +49,6 @@ void assignString(Fw::StringBase& destination, const CHAR* bytes, FwSizeType len
 
 extern "C" {
 
-U32 fprime_rust_runtime_marker() {
-    return 0x52555354U;  // "RUST"
-}
-
 void fprime_rust_assert(const CHAR* file, FwSizeType fileLength, U32 line, const CHAR* msg, FwSizeType msgLength) {
     // Bounded NUL-terminated copies: Rust strings are not NUL-terminated
     CHAR fileBuffer[FW_FIXED_LENGTH_STRING_SIZE];

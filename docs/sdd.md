@@ -35,7 +35,7 @@ the executable. The user writes the `.fpp` and the `.rs`; no `.cpp`/`.hpp` is wr
 | REQ-FprimeRust-021 | A Rust component shall build from a module registering only its `.fpp` and `.rs` sources. | Unit Test |
 | REQ-FprimeRust-022 | The autocoder shall rerun when any translation unit or closure file changes. | Unit Test |
 | REQ-FprimeRust-023 | Handlers of one component instance shall never run concurrently on its Rust state. | Unit Test |
-| REQ-FprimeRust-024 | A Rust panic shall reach the F Prime assertion hook with its message and location, then abort. | Unit Test |
+| REQ-FprimeRust-024 | A Rust panic shall reach the F Prime assertion hook with its file and line, its message logged via Fw::Logger, then abort. | Unit Test |
 | REQ-FprimeRust-025 | The Rust implementation shall be constructed once at instantiation and dropped at destruction. | Unit Test |
 | REQ-FprimeRust-026 | Generated C++ and Rust names shall match the generated-name table. | Unit Test |
 | REQ-FprimeRust-027 | A cookiecutter shall create a Rust component with `.fpp`, `.rs`, CMakeLists and `docs/sdd.md`. | Unit Test |
@@ -60,7 +60,7 @@ Type-mapping table (REQ-FprimeRust-016):
 | F32, F64 | f32, f64 |
 | bool | bool |
 | enum E | generated `#[repr(<FPP repr>)] enum E` |
-| string (any size) | `&str` in; `&str` out (copied by the shim, REQ-037) |
+| string (any size) as a port argument, event or telemetry value; `string size N` as a parameter or port return | `&str` in; `&str` out (copied by the shim, REQ-037); a parameter get or port return needs the declared `N` for its Rust buffer (unsized is rejected, DEVELOPMENT ruling 9) |
 | alias type `type T = U` | as its underlying type `U` |
 
 Rejected-element table (REQ-FprimeRust-017; each fails generation naming the element):
@@ -69,6 +69,7 @@ Rejected-element table (REQ-FprimeRust-017; each fails generation naming the ele
 |---|---|
 | serial port | handler takes a serialization buffer |
 | state machine instance | actions and guards take a state-machine id and signal |
+| `ref` port parameter | a value copied over the C ABI has no write-back to the caller (DEVELOPMENT ruling 9) |
 | data-product container or product port | handler takes `Fw::DpContainer` |
 | struct, array or abstract type (e.g. `Fw.Buffer`, `Fw.ComBuffer`) used as an argument, return, channel or parameter type | not carried over the C ABI in this release |
 
@@ -102,7 +103,7 @@ Generated-name table (component `Ns.Comp`, element `X`; FFI symbols are `fprime_
 | input port X (sync, guarded, async) | `X_handler(portNum, args)` | `X_handler` | `fn X_handler(&mut self, ctx: &mut Context<'_>, port_num, args) [-> R]` |
 | output port X | `X_out(portNum, args)` | `X_out` | `ctx.X_out(port_num, args) [-> R]` |
 | internal port X | `X_internalInterfaceHandler(args)` / `X_internalInterfaceInvoke(args)` | `X_internal_handler` / `X_internal_invoke` | `fn X_internal_handler(&mut self, ctx, args)` / `ctx.X_internal_invoke(args)` |
-| `hook` member X | `X_overflowHook(portNum, args)` / `X_cmdOverflowHook(opCode, cmdSeq)` | `X_overflow_hook` | `fn X_overflow_hook(&mut self, ctx, …)` (template stub; command stub responds `BUSY`) |
+| `hook` member X | `X_overflowHook(portNum, args)` / `X_cmdOverflowHook(opCode, cmdSeq)` | `X_overflow_hook` | `fn X_overflow_hook(ctx: &mut Context, …)` — no `&mut self`, no lock (template stub; command stub responds `BUSY`) |
 | command X (async, sync, guarded) | `X_cmdHandler(opCode, cmdSeq, args)` | `X_cmd_handler` | `fn X_cmd_handler(&mut self, ctx, args) -> CmdResponse` |
 | event X severity S | `log_S_X(args)` | `log_S_X` | `ctx.log_S_X(args)` |
 | telemetry X | `tlmWrite_X(v)` | `tlmWrite_X` | `ctx.tlmWrite_X(v)` |
@@ -132,8 +133,8 @@ dependency list, collects every recorded component, runs `fprime-rust-ac crate` 
 builds it with `cargo build --profile <FPRIME_RUST_PROFILE> --target <FPRIME_RUST_TARGET> --target-dir
 <bin>/fprime_rust/target` (every profile: `panic = "abort"`, `lto = true`, `overflow-checks = false`; lints
 `unsafe_op_in_unsafe_fn`, `clippy::unwrap_used`, `clippy::expect_used`, `clippy::indexing_slicing`,
-`clippy::arithmetic_side_effects` = deny), and links the single archive plus the `native-static-libs` cargo
-reports `PRIVATE` into the executable. The shim's `extern "C"` references resolve at that final link, so
+`clippy::arithmetic_side_effects` = deny), and links the single archive plus a fixed per-platform system-library list (`FPRIME_RUST_NATIVE_LIBS`, Linux default
+`pthread dl m gcc_s c`; cargo's `native-static-libs` is only known at build time, so a configure-time probe is future work — DEVELOPMENT ruling 5) `PRIVATE` into the executable. The shim's `extern "C"` references resolve at that final link, so
 Rust std and the runtime exist once per executable; a component unit-test executable gets its own
 `libfprime_rust_<Comp>_ut.a` the same way (`FprimeRust.cmake` registers `target/fprime_rust` with both
 `register_fprime_target` and `register_fprime_ut_target`, so `register_fprime_ut` executables receive their own archive). There is no topology annotation (fprime-python marks the
@@ -154,10 +155,9 @@ not be set. Platform constraint: `fprime-fpp-python` wheels exist only for linux
 manylinux2014), macOS-arm64 and win-x64 (REQ-040); the Rust archive is built for `FPRIME_RUST_TARGET`
 (default: host triple) and only the host triple is exercised by this campaign. Allocation profile: generated
 code allocates once per instance at construction (`Box<Implementation>`) and, after initialization, only when
-an incoming string is not valid UTF-8 (`from_utf8_lossy`); all other generated paths are allocation-free; Rust
-std is linked, so an allocation-free deployment must audit the user `.rs` files. Deliberate deviation from
-fprime-python: struct, array and abstract types are rejected in this release (follow-on: serializers from
-`fprime-cpp-codegen`).
+an incoming string is not valid UTF-8 (`from_utf8_lossy`); string parameter gets and string port returns build a bounded `String`; all other generated paths are allocation-free (DEVELOPMENT ruling 8); Rust
+std is linked, so an allocation-free deployment must audit the user `.rs` files. Deliberate deviations from
+fprime-python are listed in §Deviations from fprime-python.
 
 ### Configure
 
@@ -189,11 +189,14 @@ component kind is honored unchanged. Each handler the base calls is forwarded ov
 `Sync`; storing it in `Implementation` is a compile-time error). Memory crosses the FFI only as borrowed
 pointers valid for the call; no allocation changes owner. Instance mutex rule, every component kind: the
 shim takes the instance's non-recursive `Os::Mutex` in every FFI entry that receives `&mut Implementation`
-— port handlers of all kinds, internal-port and command handlers, overflow hooks, `parameter_updated`,
+— port handlers of all kinds, internal-port and command handlers, `parameter_updated`,
 `init` — with one exception generated per kind: on a `queued` component the async port, async command and
-internal-port entries take no lock, because they are reachable only through the drain below. Overflow hooks of
-**internal ports** take no lock on either kind: their only caller is the instance's own handler, which holds the
-mutex. Queued dispatch
+internal-port entries take no lock, because they are reachable only through the drain below. Overflow hooks
+(`hook` ports, `hook` commands, internal-port hooks) are the one entry that never receives `&mut Implementation`:
+`fn X_overflow_hook(ctx: &mut Context, …)` runs on the caller's thread with no lock and may only use the
+`Context` (events, telemetry, a `BUSY` command response). The invoking handler may be holding
+`&mut Implementation` at that moment, so a second reference would be undefined behaviour (DEVELOPMENT ruling 6).
+Queued dispatch
 (no Rust-visible primitive): every generated sync/guarded entry of a queued component takes the lock once,
 calls `this->dispatchAvailableMessages()` (base semantics: at most the messages present at entry, stops on
 the first non-OK status), and only then constructs `&mut Implementation` for the user handler, so the
@@ -207,17 +210,16 @@ of synchronous ports through several Rust instances, is a design error documente
 Rust-to-Rust synchronous edges are lock edges and must form a DAG (break cycles with an `async` port, as the
 reference does with `relay.countOut -> rustMonitor.countIn`). On a Rust component `sync` and `guarded` inputs
 are therefore equivalent and a Rust component is not suitable for lock-free cyclic work shared by several
-callers. Overflow hooks run on the caller's thread under the same mutex; on an active component a hook
-therefore blocks the caller until the running handler returns — use `drop` (or `assert`) on inputs driven by
-rate groups or drivers, and `hook` only where the caller can afford to wait. `parameter_updated` runs on the
+callers. Overflow hooks run on the caller's thread without the mutex and return immediately; `hook` is therefore the
+safe queue-full policy for inputs driven by rate groups, drivers or the command dispatcher. `parameter_updated` runs on the
 command caller's thread (parameter set/save commands are handled synchronously by the base for every kind) and at
 start-up on the loading thread, under the instance mutex; it must not block and must not assume the component
 thread.
 `init` receives an `InitContext` with no port, event, telemetry or parameter access; parameters are
 available from the first handler call (after `loadParameters`). Command handlers return `CmdResponse`,
 which the shim forwards to `cmdResponse_out`. The runtime installs a panic hook once per process that
-forwards message and location to the F Prime assertion hook before `abort` (REQ-024); the alloc-error
-handler aborts the same way. The Rust implementation is constructed by the shim constructor and dropped by
+logs the message through `Fw::Logger` and reports file and line to the F Prime assertion hook before `abort` (REQ-024);
+allocation failure aborts via std with no F Prime hook (stable Rust has no `alloc_error_handler` — DEVELOPMENT ruling 4). The Rust implementation is constructed by the shim constructor and dropped by
 its destructor.
 
 ```mermaid
@@ -235,6 +237,20 @@ sequenceDiagram
   S->>S: unlock
   S->>B: cmdResponse_out(opCode, seq, OK)
 ```
+
+## Deviations from fprime-python
+
+Recorded under the Captain's approval waiver (anchor ruling 12, Captain ruling R1): the waiver stands and the
+deviations stay documented here rather than being reversed.
+
+- Struct, array and abstract types (`Fw.Buffer`, `Fw.Com`, serial ports, state machines, data products) are rejected
+  in this release; fprime-python forwards them as Python objects (follow-on: serializers from `fprime-cpp-codegen`).
+- Unsized `string` parameters and port returns, and `ref` port parameters, are rejected (Rust needs a compile-time
+  buffer; no write-back across the C ABI).
+- Mutex and queued model: every FFI entry that reaches `&mut Implementation` takes the instance mutex; a Rust queued
+  component drains its queue in every sync/guarded entry (fprime-python relies on the GIL and the F Prime scheduler
+  port only). Overflow hooks receive `&mut Context` only.
+- Strings are borrowed over the FFI as `&str` and copied back by the shim; fprime-python shares Python objects.
 
 ## Tests
 
@@ -271,18 +287,18 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 | UT-AC-9 | cookiecutter renders `.fpp`, `.rs`, `CMakeLists.txt`, `docs/sdd.md` for each `component_kind` | REQ-FprimeRust-027 |
 | UT-RT-1 | `CmdResponse`/`ParamValid`/`MsgDispatchStatus` round-trip their F Prime integer codes | REQ-FprimeRust-012, REQ-FprimeRust-015 |
 | UT-RT-2 | `Context` is neither `Send` nor `Sync` (`static_assertions::assert_not_impl_any!`) | REQ-FprimeRust-023 |
-| UT-RT-3 | a panic in a handler reaches the registered F Prime assert hook with the Rust `file:line`, then the process aborts (death test) | REQ-FprimeRust-024 |
-| UT-RT-4 | `cargo miri test` over the queued fixture of UT-SHIM-6 (shim entries replayed from Rust): no Stacked Borrows violation reported | REQ-FprimeRust-023 |
+| UT-RT-3 | a panic in a handler reaches the registered F Prime assert hook with the Rust `file:line` after its message is logged, then the process aborts (death test) | REQ-FprimeRust-024 |
+| UT-RT-4 | `cargo miri test` over the runtime crate's safe wrappers (conversions, string decode, panic hook): no Stacked Borrows violation reported (DEVELOPMENT ruling 3: the C++ shim cannot run under Miri); generated overflow-hook entries are checked by `tests/test_autocode.py::test_overflow_hooks_never_borrow_the_implementation` | REQ-FprimeRust-023 |
 | UT-SHIM-1 | GTest tester base over the shim: one async, one sync and one guarded command each reach Rust and return `OK`/`VALIDATION_ERROR` as the fixture dictates | REQ-FprimeRust-012 |
 | UT-SHIM-2 | one sync, one guarded and one async typed input port reach Rust with arguments; a port with a return type returns the Rust value; a Rust output-port call invokes the C++ port with the same arguments | REQ-FprimeRust-009, REQ-FprimeRust-010, REQ-FprimeRust-033 |
 | UT-SHIM-3 | active fixture: a guarded port called from a second thread while an async handler sleeps is serialized (observed order, no overlap); passive fixture: two sync callers serialized | REQ-FprimeRust-023 |
 | UT-SHIM-4 | constructor calls `new` once; `init` once with no port access; destructor drops once; `parameterUpdated(id)` reaches Rust once per `PRM_SET` | REQ-FprimeRust-025, REQ-FprimeRust-030 |
 | UT-SHIM-5 | one fixture per kind (active, queued, passive) dispatches a port and a command to Rust | REQ-FprimeRust-008 |
-| UT-SHIM-6 | queued fixture: two messages queued before `run`; the generated `run` entry drains both handlers exactly once on the caller's thread before `run_handler` is entered, `ctx.last_dispatch()` is `Empty`, no lock is re-taken (a non-recursive mutex would deadlock) | REQ-FprimeRust-008, REQ-FprimeRust-023 |
+| UT-SHIM-6 | queued fixture: two messages queued before `run`; the generated `run` entry drains both handlers exactly once on the caller's thread before `run_handler` is entered, `ctx.last_dispatch()` is `MSG_DISPATCH_OK` (the base returns the last dispatch status, OK after a drain — DEVELOPMENT ruling 1), no lock is re-taken (a non-recursive mutex would deadlock) | REQ-FprimeRust-008, REQ-FprimeRust-023 |
 | UT-SHIM-7 | one event per severity (ACTIVITY_LO/HI, WARNING_LO/HI, COMMAND, DIAGNOSTIC) is logged with arguments; FATAL under the death-test fixture | REQ-FprimeRust-013 |
 | UT-SHIM-8 | telemetry of each type-table row is written with the value; `paramGet` returns `(value, VALID)`, `(default, DEFAULT)` and `(value, INVALID)` per fixture | REQ-FprimeRust-014, REQ-FprimeRust-015 |
-| UT-SHIM-9 | internal port invoked from Rust reaches the Rust internal handler through the queue; an async port and an async command with `hook` call the Rust overflow hook when the queue is full (command hook responds `BUSY`); an internal port with `hook` invoked from a handler on a full queue calls the Rust hook without re-locking | REQ-FprimeRust-031, REQ-FprimeRust-032 |
+| UT-SHIM-9 | internal port invoked from Rust reaches the Rust internal handler through the queue; an async port and an async command with `hook` call the Rust overflow hook when the queue is full (command hook responds `BUSY`); an internal port with `hook` invoked from a handler on a full queue calls the Rust hook while the handler holds `&mut Implementation`; hooks receive only `&mut Context` (no implementation reference, no lock) | REQ-FprimeRust-031, REQ-FprimeRust-032 |
 | UT-SHIM-10 | a 48-byte Rust string into an unsized command-string argument is stored as its first `FW_CMD_STRING_MAX_SIZE` (40) bytes and into a `string size 40` event as its first 40 bytes; `"ab\0cd"` is stored as `"ab"`; incoming bytes `0xFF 0x41` arrive as `"\u{FFFD}A"` | REQ-FprimeRust-037, REQ-FprimeRust-038 |
 | UT-BUILD-1 | CMake build of a two-component fixture deployment registered per §Configure: exactly one `libfprime_rust_<Deployment>.a` on the link line; `nm` shows exactly one `T` definition of the exported runtime marker `fprime_rust_runtime_marker`; no duplicate-symbol diagnostics | REQ-FprimeRust-018, REQ-FprimeRust-020, REQ-FprimeRust-021 |
 | UT-BUILD-2 | fixture deployment with no annotated component builds; cargo is not invoked (no `fprime_rust/` directory); with `FPRIME_RUST_CARGO` pointing at a missing file configure fails naming it; a user `.rs` with a type error fails the build with the rustc diagnostic | REQ-FprimeRust-039, REQ-FprimeRust-035, REQ-FprimeRust-036 |
-| UT-INSP-1 | inspection: `pip download fprime-fpp-python==4.0.1 --only-binary :all:` succeeds for the three stated platform tags and no other | REQ-FprimeRust-040 |
+| UT-INSP-1 | inspection: `pip download fprime-fpp-python==4.0.1 --only-binary :all:` succeeds for at least the three stated platform tags (DEVELOPMENT ruling 2) | REQ-FprimeRust-040 |

@@ -175,8 +175,6 @@ extern "C" {
     pub fn fprime_rust_assert(file: *const u8, file_len: usize, line: u32, msg: *const u8, msg_len: usize) -> !;
     /// C++ runtime: assign bytes into a `Fw::StringBase` carrier (truncating to capacity and interior NUL)
     pub fn fprime_rust_string_assign(carrier: *mut c_void, bytes: *const u8, len: usize);
-    /// C++ runtime marker: one definition per executable (REQ-FprimeRust-020)
-    pub fn fprime_rust_runtime_marker() -> u32;
 }
 
 /// Assign a Rust string into a `Fw::StringBase` carrier owned by C++ (port string return values).
@@ -227,4 +225,11 @@ pub fn enum_from_repr<T, R: std::fmt::Debug + Copy>(value: R, decode: fn(R) -> O
         Some(decoded) => decoded,
         None => panic!("invalid {} enumeration value {:?} received over the FFI", name, value),
     }
+}
+
+/// Runtime marker: exactly one Rust runtime per executable (REQ-FprimeRust-020). Every generated shim calls it,
+/// which keeps the runtime objects in the link; a second runtime would duplicate the symbol.
+#[no_mangle]
+pub extern "C" fn fprime_rust_runtime_marker() -> u32 {
+    0x5255_5354 // "RUST"
 }

@@ -17,7 +17,7 @@ struct FprimeRustContext {
 };
 
 extern "C" {
-//! Exported runtime marker; exactly one definition per executable (REQ-FprimeRust-020)
+//! Runtime marker defined by the Rust runtime crate; exactly one definition per executable (REQ-FprimeRust-020)
 U32 fprime_rust_runtime_marker();
 
 //! Rust panic bridge: log `msg`, report `file:line` to the F Prime assertion hook, then abort

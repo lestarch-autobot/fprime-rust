@@ -71,7 +71,9 @@ function(fprime_rust_setup_autocode MODULE_NAME AC_INPUT_FILES)
         append_list_property("${COMPONENT_SPECS}" TARGET "${MODULE_NAME}" PROPERTY FPRIME_RUST_COMPONENTS)
         # The executable's Rust archive (its FPRIME_RUST_ARCHIVE property, set by target/fprime_rust) is linked
         # right after this module so the shim objects defining the helpers it references precede it
-        target_link_libraries("${MODULE_NAME}" INTERFACE "$<TARGET_PROPERTY:FPRIME_RUST_ARCHIVE>" FprimeRust)
+        # The archive follows the shim objects; the C++ runtime file follows the archive once more (as a path, so CMake
+        # does not fold it into the earlier target reference) because the Rust panic hook references `fprime_rust_assert`
+        target_link_libraries("${MODULE_NAME}" INTERFACE "$<TARGET_PROPERTY:FPRIME_RUST_ARCHIVE>" "$<TARGET_FILE:FprimeRust>")
         fprime_rust_get_model_files()
         add_custom_command(
             OUTPUT ${GENERATED_BUILD_FILES}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -46,7 +47,7 @@ def test_annotated_component_emits_shim_base_and_template(build_dir: Path, tmp_p
     files = bindings_files(build_dir, out, [FIXTURES], [RICH])
     assert set(files) == {out / "Rich.hpp", out / "Rich.cpp", out / "rich_base.rs", out / "Rich.template.rs",
                           COMPONENTS / "Rich.rs"} - ({COMPONENTS / "Rich.rs"} if (COMPONENTS / "Rich.rs").exists() else set())
-    assert "class Rich final : public RichComponentBase" in files[out / "Rich.hpp"]
+    assert re.search(r"class Rich final :\s+public RichComponentBase", files[out / "Rich.hpp"])
     assert "pub trait Component" in files[out / "rich_base.rs"]
     assert "impl Component for" in files[out / "Rich.template.rs"]
 
@@ -215,3 +216,20 @@ def test_dry_run_lists_exactly_the_files_written(build_dir: Path, tmp_path: Path
     written = sorted(list(out.iterdir()) + [seed])
     assert listed == written
     assert seed.read_text() == (out / "Rich.template.rs").read_text()
+
+
+def test_overflow_hooks_never_borrow_the_implementation(build_dir: Path, tmp_path: Path):
+    """Ruling 6 regression: hook entries get no `fpr_impl` and create no `&mut Implementation` (the invoking handler
+    may hold one), on the C++ and the Rust side"""
+    out = tmp_path / "out"
+    files = bindings_files(build_dir, out, [FIXTURES], [RICH])
+    base, cpp = files[out / "rich_base.rs"], files[out / "Rich.cpp"]
+    hooks = [block for block in base.split("#[no_mangle]") if "_overflow_hook(" in block.split("{", 1)[0]]
+    assert hooks, "the Rich fixture declares hook members"
+    for block in hooks:
+        assert "fpr_impl" not in block and "&mut *(" not in block
+        assert "Implementation::" in block
+    assert "_overflow_hook(&mut self" not in base
+    for line in cpp.splitlines():
+        if "_overflow_hook(" in line and "::" not in line:
+            assert "this->m_impl" not in line

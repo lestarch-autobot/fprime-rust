@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from . import names
-from .rust_base import rust_return_type, user_params
+from .rust_base import hook_params, rust_return_type, user_params
 from .view import ComponentView, TypeInfo
 
 QUEUED_NOTE = """// NOTE (queued component): every sync/guarded input of a Rust queued component drains the queue before
@@ -50,20 +50,20 @@ def generate(view: ComponentView) -> str:
             lines.append(f"        {default_value(port.returns)}")
         lines.append("    }")
         if port.hook:
-            lines += ["", f"    fn {names.rust_overflow_hook(port)}({params}) {{", f"        let _ = {unused};", "    }"]
+            lines += ["", f"    fn {names.rust_overflow_hook(port)}({hook_params(params)}) {{", f"        let _ = {unused};", "    }"]
     for port in view.internal_ports:
         params = ", ".join(["&mut self", "ctx: &mut Context<'_>"] + user_params(port.params))
         unused = unused_tuple(["ctx"] + [param.name for param in port.params])
         lines += ["", f"    fn {names.rust_internal_handler(port)}({params}) {{", f"        let _ = {unused};", "    }"]
         if port.hook:
-            lines += ["", f"    fn {names.rust_overflow_hook(port)}({params}) {{", f"        let _ = {unused};", "    }"]
+            lines += ["", f"    fn {names.rust_overflow_hook(port)}({hook_params(params)}) {{", f"        let _ = {unused};", "    }"]
     for command in view.commands:
         params = ", ".join(["&mut self", "ctx: &mut Context<'_>"] + user_params(command.params))
         unused = unused_tuple(["ctx"] + [param.name for param in command.params])
         lines += ["", f"    fn {names.rust_cmd_handler(command)}({params}) -> CmdResponse {{",
                   f"        let _ = {unused};", "        CmdResponse::Ok", "    }"]
         if command.hook:
-            lines += ["", f"    fn {names.rust_overflow_hook(command)}(&mut self, ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse {{",
+            lines += ["", f"    fn {names.rust_overflow_hook(command)}(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse {{",
                       "        let _ = (ctx, opcode, cmd_seq);", "        CmdResponse::Busy", "    }"]
     lines += ["}", ""]
     return "\n".join(lines)

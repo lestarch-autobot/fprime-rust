@@ -36,10 +36,15 @@ def test_ut_build_2_module_without_annotation_runs_no_cargo():
         assert (build / "Fixtures" / executable.replace("Fixtures_", "").replace("_ut_exe", "") / "fprime_rust" / executable).is_dir()
 
 
+FRAMEWORK = PROJECT.parents[1] / "lib" / "fprime"
+
+
 @pytest.mark.skipif(shutil.which("cmake") is None, reason="cmake not on PATH")
+@pytest.mark.skipif(not (FRAMEWORK / "cmake" / "FPrime.cmake").exists(),
+                    reason="lib/fprime submodule not initialized (git submodule update --init)")
 def test_ut_build_2_missing_cargo_fails_configure_naming_it(tmp_path):
     result = subprocess.run(["cmake", str(PROJECT), "-DFPRIME_RUST_CARGO=/nonexistent/cargo", "-G", "Ninja",
-                             f"-DFPRIME_FRAMEWORK_PATH={PROJECT.parents[1] / 'lib' / 'fprime'}"],
+                             f"-DFPRIME_FRAMEWORK_PATH={FRAMEWORK}"],
                             cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode != 0
     assert "/nonexistent/cargo" in result.stderr + result.stdout

@@ -100,21 +100,22 @@ def _trait_block(view: ComponentView) -> List[str]:
         lines += ["", f"    /// `{port.kind}` input port `{port.name}` ({port.port_qualified_name})",
                   f"    fn {names.rust_handler(port)}({params}){rust_return_type(port.returns)};"]
         if port.hook:
-            lines += ["", f"    /// Overflow hook of `{port.name}`: the queue was full",
-                      f"    fn {names.rust_overflow_hook(port)}({params});"]
+            lines += ["", f"    /// Overflow hook of `{port.name}`: the queue was full; runs on the caller's thread with no lock and",
+                      "    /// no access to the implementation (Context only)",
+                      f"    fn {names.rust_overflow_hook(port)}({hook_params(params)});"]
     for port in view.internal_ports:
         params = ", ".join(["&mut self", "ctx: &mut Context<'_>"] + user_params(port.params))
         lines += ["", f"    /// Internal port `{port.name}`", f"    fn {names.rust_internal_handler(port)}({params});"]
         if port.hook:
-            lines += ["", f"    /// Overflow hook of internal port `{port.name}` (called by the invoking handler, no re-lock)",
-                      f"    fn {names.rust_overflow_hook(port)}({params});"]
+            lines += ["", f"    /// Overflow hook of internal port `{port.name}`: called by the invoking handler; Context only",
+                      f"    fn {names.rust_overflow_hook(port)}({hook_params(params)});"]
     for command in view.commands:
         params = ", ".join(["&mut self", "ctx: &mut Context<'_>"] + user_params(command.params))
         lines += ["", f"    /// `{command.kind}` command `{command.name}` (opcode {command.opcode})",
                   f"    fn {names.rust_cmd_handler(command)}({params}) -> CmdResponse;"]
         if command.hook:
-            lines += ["", f"    /// Overflow hook of command `{command.name}`: the returned response is sent for the command",
-                      f"    fn {names.rust_overflow_hook(command)}(&mut self, ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;"]
+            lines += ["", f"    /// Overflow hook of command `{command.name}`: the returned response is sent for the command; Context only",
+                      f"    fn {names.rust_overflow_hook(command)}(ctx: &mut Context<'_>, opcode: FwOpcodeType, cmd_seq: u32) -> CmdResponse;"]
     lines += ["", "    /// A parameter was set (`PRM_SET`) or loaded at start-up",
               "    fn parameter_updated(&mut self, ctx: &mut Context<'_>, id: FwPrmIdType) {",
               "        let _ = (ctx, id);", "    }", "}"]
@@ -248,6 +249,17 @@ ENTRY_PRELUDE = [
     "let mut ctx = Context { raw: unsafe { &mut *fpr_ctx }, _marker: NotThreadSafe::new() };",
 ]
 
+# Overflow hooks never touch the implementation: the invoking handler may hold `&mut Implementation` right now
+HOOK_PRELUDE = [
+    "// SAFETY: the shim passes a context borrowed for this call; no implementation reference is created",
+    "let mut ctx = Context { raw: unsafe { &mut *fpr_ctx }, _marker: NotThreadSafe::new() };",
+]
+
+
+def hook_params(params: str) -> str:
+    """Trait signature of an overflow hook: the handler signature without `&mut self`"""
+    return params.replace("&mut self, ", "", 1)
+
 
 def _entries_block(view: ComponentView) -> List[str]:
     lines: List[str] = []
@@ -269,28 +281,30 @@ def _entries_block(view: ComponentView) -> List[str]:
     lines += _entry(names.parameter_updated(view), ["fpr_impl: *mut c_void", "fpr_ctx: *mut RawContext", "fpr_id: FwPrmIdType"],
                     ENTRY_PRELUDE + ["this.parameter_updated(&mut ctx, fpr_id);"])
     base = ["fpr_impl: *mut c_void", "fpr_ctx: *mut RawContext"]
+    hook_base = ["fpr_ctx: *mut RawContext"]
     for port in view.input_ports:
         params = base + ["fpr_port_num: FwIndexType"] + ffi_params_rust(port.params) + _result_params(port.returns)
         call = f"this.{names.rust_handler(port)}({', '.join(['&mut ctx', 'fpr_port_num'] + user_args(port.params))})"
         lines += _entry(names.handler(view, port), params, ENTRY_PRELUDE + decode_statements(port.params) + _store_result(call, port.returns))
         if port.hook:
-            params = base + ["fpr_port_num: FwIndexType"] + ffi_params_rust(port.params)
-            call = f"this.{names.rust_overflow_hook(port)}({', '.join(['&mut ctx', 'fpr_port_num'] + user_args(port.params))});"
-            lines += _entry(names.overflow_hook(view, port), params, ENTRY_PRELUDE + decode_statements(port.params) + [call])
+            params = hook_base + ["fpr_port_num: FwIndexType"] + ffi_params_rust(port.params)
+            call = f"Implementation::{names.rust_overflow_hook(port)}({', '.join(['&mut ctx', 'fpr_port_num'] + user_args(port.params))});"
+            lines += _entry(names.overflow_hook(view, port), params, HOOK_PRELUDE + decode_statements(port.params) + [call])
     for port in view.internal_ports:
         params = base + ffi_params_rust(port.params)
         call = f"this.{names.rust_internal_handler(port)}({', '.join(['&mut ctx'] + user_args(port.params))});"
         lines += _entry(names.internal_handler(view, port), params, ENTRY_PRELUDE + decode_statements(port.params) + [call])
         if port.hook:
-            call = f"this.{names.rust_overflow_hook(port)}({', '.join(['&mut ctx'] + user_args(port.params))});"
-            lines += _entry(names.overflow_hook(view, port), params, ENTRY_PRELUDE + decode_statements(port.params) + [call])
+            call = f"Implementation::{names.rust_overflow_hook(port)}({', '.join(['&mut ctx'] + user_args(port.params))});"
+            lines += _entry(names.overflow_hook(view, port), hook_base + ffi_params_rust(port.params),
+                            HOOK_PRELUDE + decode_statements(port.params) + [call])
     for command in view.commands:
         params = base + ffi_params_rust(command.params)
         call = f"this.{names.rust_cmd_handler(command)}({', '.join(['&mut ctx'] + user_args(command.params))}).code()"
         lines += _entry(names.cmd_handler(view, command), params, ENTRY_PRELUDE + decode_statements(command.params) + [call], " -> u32")
         if command.hook:
-            lines += _entry(names.overflow_hook(view, command), base + ["fpr_opcode: FwOpcodeType", "fpr_cmd_seq: u32"],
-                            ENTRY_PRELUDE + [f"this.{names.rust_overflow_hook(command)}(&mut ctx, fpr_opcode, fpr_cmd_seq).code()"], " -> u32")
+            lines += _entry(names.overflow_hook(view, command), hook_base + ["fpr_opcode: FwOpcodeType", "fpr_cmd_seq: u32"],
+                            HOOK_PRELUDE + [f"Implementation::{names.rust_overflow_hook(command)}(&mut ctx, fpr_opcode, fpr_cmd_seq).code()"], " -> u32")
     return lines
 
 

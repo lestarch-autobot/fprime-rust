@@ -14,12 +14,7 @@ pub extern "C" fn fprime_rust_assert(file: *const u8, file_len: u64, line: u32, 
 }
 
 #[no_mangle]
-pub extern "C" fn fprime_rust_string_assign(_carrier: *mut std::ffi::c_void, _bytes: *const u8, _len: u64) {}
-
-#[no_mangle]
-pub extern "C" fn fprime_rust_runtime_marker() -> u32 {
-    0
-}
+pub extern "C" fn fprime_rust_string_assign(_carrier: *mut std::ffi::c_void, _bytes: *const u8, _len: usize) {}
 
 fn handler_that_panics() {
     panic!("handler failure");
