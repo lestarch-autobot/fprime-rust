@@ -1,0 +1,20 @@
+register_fprime_module(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/PassiveFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/PassiveFix.rs"
+    DEPENDS
+        Fixtures_Ports
+)
+
+register_fprime_ut(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/PassiveFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/PassiveFixTester.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/PassiveFixTestMain.cpp"
+    DEPENDS
+        Fixtures_PassiveFix
+        STest
+    UT_AUTO_HELPERS
+)
