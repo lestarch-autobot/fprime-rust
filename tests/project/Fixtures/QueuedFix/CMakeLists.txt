@@ -1,0 +1,20 @@
+register_fprime_module(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/QueuedFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/QueuedFix.rs"
+    DEPENDS
+        Fixtures_Ports
+)
+
+register_fprime_ut(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/QueuedFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/QueuedFixTester.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/QueuedFixTestMain.cpp"
+    DEPENDS
+        Fixtures_QueuedFix
+        STest
+    UT_AUTO_HELPERS
+)

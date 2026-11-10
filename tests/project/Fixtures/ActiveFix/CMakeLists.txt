@@ -1,0 +1,20 @@
+register_fprime_module(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/ActiveFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/ActiveFix.rs"
+    DEPENDS
+        Fixtures_Ports
+)
+
+register_fprime_ut(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/ActiveFix.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/ActiveFixTester.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/ActiveFixTestMain.cpp"
+    DEPENDS
+        Fixtures_ActiveFix
+        STest
+    UT_AUTO_HELPERS
+)
